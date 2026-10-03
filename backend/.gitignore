@@ -1,0 +1,9 @@
+# Python-specific subset, kept here too in case `git` is ever run from
+# within `backend/` instead of the repo root (see root .gitignore for the
+# full set of ignored paths).
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.env

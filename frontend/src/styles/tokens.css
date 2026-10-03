@@ -1,0 +1,50 @@
+/*
+ * Design tokens - the single source of truth for both themes.
+ * Light and dark palettes are intentionally paired (same roles, tuned
+ * values) so switching themes never produces two unrelated designs.
+ * Contrast pairs are chosen to meet WCAG AA in both modes.
+ */
+:root,
+[data-theme="light"] {
+  --color-bg: 248 250 252; /* slate-50 */
+  /* Ambient decoration - soft washes of color behind content.
+     Light mode: barely-there tints over the clean slate base. */
+  --ambient-primary: 79 70 229; /* indigo-600 */
+  --ambient-secondary: 217 119 6; /* amber-600 - warm counterpoint */
+  --ambient-tertiary: 14 165 233; /* sky-500 */
+  --ambient-opacity: 0.07;
+  --ambient-opacity-strong: 0.12;
+  --color-surface: 255 255 255;
+  --color-surface-hover: 241 245 249; /* slate-100 */
+  --color-border: 226 232 240; /* slate-200 */
+  --color-text: 15 23 42; /* slate-900 */
+  --color-text-muted: 100 116 139; /* slate-500 */
+  --color-accent: 79 70 229; /* indigo-600 */
+  --color-accent-hover: 67 56 202; /* indigo-700 */
+  --color-accent-contrast: 255 255 255;
+  --color-success: 22 163 74; /* green-600 */
+  --color-warning: 217 119 6; /* amber-600 */
+  --color-danger: 220 38 38; /* red-600 */
+}
+
+[data-theme="dark"] {
+  --color-bg: 9 11 17; /* near-black blue */
+  /* Dark mode: deeper ambient glow - slightly stronger opacity reads
+     as soft light against the near-black base, not brightness. */
+  --ambient-primary: 129 140 248; /* indigo-400 */
+  --ambient-secondary: 251 191 36; /* amber-400 */
+  --ambient-tertiary: 56 189 248; /* sky-400 */
+  --ambient-opacity: 0.10;
+  --ambient-opacity-strong: 0.16;
+  --color-surface: 17 20 29;
+  --color-surface-hover: 26 30 42;
+  --color-border: 39 45 60;
+  --color-text: 226 232 240; /* slate-200 */
+  --color-text-muted: 148 163 184; /* slate-400 */
+  --color-accent: 129 140 248; /* indigo-400 */
+  --color-accent-hover: 99 102 241; /* indigo-500 */
+  --color-accent-contrast: 15 15 25;
+  --color-success: 74 222 128; /* green-400 */
+  --color-warning: 251 191 36; /* amber-400 */
+  --color-danger: 248 113 113; /* red-400 */
+}

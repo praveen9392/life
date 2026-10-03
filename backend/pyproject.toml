@@ -1,0 +1,31 @@
+[project]
+name = "life-backend"
+version = "0.1.0"
+description = "Backend API for the Life personal life-management platform"
+requires-python = ">=3.11"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+# E501: handled by line-length formatting, not worth failing CI over.
+# B008: FastAPI's `Depends(...)` as a default argument is the idiomatic,
+# required pattern for dependency injection - not a real bug here.
+ignore = ["E501", "B008"]
+
+[tool.mypy]
+python_version = "3.11"
+plugins = ["pydantic.mypy"]
+ignore_missing_imports = true
+warn_unused_ignores = true
+disallow_untyped_defs = false
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+# Each test gets its own event loop and its own NullPool test engine (see
+# tests/conftest.py::db_session) specifically to avoid reusing asyncpg
+# connections across event loops, so function scope is intentional here.
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]

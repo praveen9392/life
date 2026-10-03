@@ -1,0 +1,8 @@
+{
+  "venvPath": "backend",
+  "venv": ".venv",
+  "include": ["backend/app", "backend/tests", "backend/migrations"],
+  "exclude": ["**/node_modules", "**/__pycache__", "**/.venv", "frontend"],
+  "reportMissingImports": "warning",
+  "pythonVersion": "3.11"
+}

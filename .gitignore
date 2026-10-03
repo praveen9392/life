@@ -1,0 +1,28 @@
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.venv/
+
+# Node / frontend
+node_modules/
+dist/
+dist-ssr/
+
+# Logs
+*.log
+logs
+
+# OS
+.DS_Store
+
+# Editors / IDEs
+.idea/
+.vscode/*
+!.vscode/extensions.json

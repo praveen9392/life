@@ -1,0 +1,97 @@
+@import "./styles/tokens.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    @apply bg-bg text-text antialiased;
+  }
+  body {
+    @apply min-h-screen font-sans;
+  }
+  /* Visible focus states everywhere (accessibility requirement). */
+  :focus-visible {
+    @apply outline-none ring-2 ring-accent ring-offset-2 ring-offset-bg;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-card border border-border bg-surface p-5 shadow-sm;
+  }
+  .input {
+    @apply w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm
+      placeholder:text-text-muted/70 focus:border-accent focus:outline-none
+      focus:ring-2 focus:ring-accent/30 disabled:opacity-60;
+  }
+  .label {
+    @apply mb-1.5 block text-sm font-medium text-text;
+  }
+
+  /* Minimal markdown rendering styles for Notes' preview pane - hand-rolled
+     (no @tailwindcss/typography dependency) using the same design tokens as
+     everything else so it looks correct in both themes. */
+  .markdown-body {
+    @apply text-sm leading-relaxed text-text;
+  }
+  .markdown-body h1 {
+    @apply mb-2 mt-4 text-xl font-semibold text-text first:mt-0;
+  }
+  .markdown-body h2 {
+    @apply mb-2 mt-4 text-lg font-semibold text-text first:mt-0;
+  }
+  .markdown-body h3 {
+    @apply mb-1.5 mt-3 text-base font-semibold text-text first:mt-0;
+  }
+  .markdown-body p {
+    @apply mb-3;
+  }
+  .markdown-body ul {
+    @apply mb-3 list-disc space-y-1 pl-5;
+  }
+  .markdown-body ol {
+    @apply mb-3 list-decimal space-y-1 pl-5;
+  }
+  .markdown-body a {
+    @apply text-accent underline underline-offset-2;
+  }
+  .markdown-body code {
+    @apply rounded bg-surface-hover px-1 py-0.5 font-mono text-[0.85em];
+  }
+  .markdown-body pre {
+    @apply mb-3 overflow-x-auto rounded-lg bg-surface-hover p-3;
+  }
+  .markdown-body pre code {
+    @apply bg-transparent p-0;
+  }
+  .markdown-body blockquote {
+    @apply mb-3 border-l-2 border-accent/50 pl-3 text-text-muted;
+  }
+  .markdown-body hr {
+    @apply my-4 border-border;
+  }
+  .markdown-body table {
+    @apply mb-3 w-full border-collapse text-sm;
+  }
+  .markdown-body th,
+  .markdown-body td {
+    @apply border border-border px-2 py-1 text-left;
+  }
+  .markdown-body input[type="checkbox"] {
+    @apply mr-1.5 accent-[rgb(var(--color-accent))];
+  }
+}
+
+/* Respect prefers-reduced-motion for CSS-driven animation (JS-driven
+   animation is gated in the useReducedMotion hook). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

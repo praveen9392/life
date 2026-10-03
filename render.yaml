@@ -1,0 +1,58 @@
+# Render blueprint: Postgres + FastAPI web service + static frontend.
+# `render.yaml` supports Render's infrastructure-as-code "Blueprint" deploys.
+
+services:
+  - type: web
+    name: life-api
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    # Migrate on every deploy, then serve. PORT is injected by Render.
+    startCommand: python -m alembic upgrade head && python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: life-db
+          property: connectionString
+          # Render gives postgresql://; asyncpg needs the async driver scheme.
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: JWT_ALGORITHM
+        value: HS256
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "15"
+      - key: REFRESH_TOKEN_EXPIRE_DAYS
+        value: "30"
+      - key: ALLOWED_ORIGINS
+        value: https://life-frontend.onrender.com # update to the real static-site URL
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: COOKIE_SAMESITE
+        value: none # frontend is a separate service/origin
+      - key: COOKIE_DOMAIN
+        value: "" # leave empty: scope cookies to the API host
+      - key: RATE_LIMIT_STORAGE_URI
+        value: memory:// # upgrade to redis:// for multi-instance
+      - key: LOG_LEVEL
+        value: INFO
+
+  - type: web
+    name: life-frontend
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_BASE_URL
+        value: https://life-api.onrender.com # update to the real API URL
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+databases:
+  - name: life-db
+    plan: starter

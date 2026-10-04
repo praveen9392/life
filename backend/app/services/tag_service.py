@@ -16,8 +16,10 @@ class TagService:
         self.session = session
         self.tags = TagRepository(session)
 
-    async def list_tags(self, user_id: uuid.UUID) -> list[Tag]:
-        return await self.tags.list_for_user(user_id)
+    async def list_tags(
+        self, user_id: uuid.UUID, *, offset: int = 0, limit: int = 100
+    ) -> list[Tag]:
+        return await self.tags.list_for_user(user_id, offset=offset, limit=limit)
 
     async def create_tag(self, user_id: uuid.UUID, payload: TagCreateRequest) -> Tag:
         """Create a tag, surfacing the `uq_tags_user_name` unique constraint

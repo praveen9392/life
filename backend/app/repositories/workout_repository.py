@@ -44,6 +44,20 @@ class ExerciseRepository(BaseRepository[Exercise]):
         )
         return (await self.session.execute(query)).scalar_one_or_none()
 
+    async def get_visible_many(
+        self, exercise_ids: set[uuid.UUID], user_id: uuid.UUID
+    ) -> set[uuid.UUID]:
+        """IDs from `exercise_ids` that are visible to the user (shared or
+        own) - the batched form of `get_visible` for validating a session's
+        sets in one query."""
+        if not exercise_ids:
+            return set()
+        query = select(Exercise.id).where(
+            Exercise.id.in_(exercise_ids),
+            or_(Exercise.user_id.is_(None), Exercise.user_id == user_id),
+        )
+        return set((await self.session.execute(query)).scalars().all())
+
 
 class WorkoutRepository(BaseRepository[Workout]):
     model = Workout

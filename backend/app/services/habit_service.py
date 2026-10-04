@@ -63,6 +63,10 @@ class HabitService:
             habit_id, user_id, log_date, payload.status, payload.note
         )
 
+    async def delete_log(self, user_id: uuid.UUID, habit_id: uuid.UUID, log_date: date) -> None:
+        await self.get_habit(user_id, habit_id)  # ownership check -> 404
+        await self.habits.delete_log(habit_id, user_id, log_date)
+
     async def get_streaks(self, user_id: uuid.UUID, habit_id: uuid.UUID, today: date) -> tuple[int, int]:
         habit = await self.get_habit(user_id, habit_id)
         logs = await self.habits.list_logs_between(user_id, habit.start_date, today, habit_ids=[habit.id])

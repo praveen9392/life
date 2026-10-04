@@ -8,7 +8,7 @@ from app.api.deps import CurrentUser, DbSession, get_pagination
 from app.repositories.note_repository import NoteSortField, SortOrder
 from app.schemas.note import NoteCreateRequest, NoteResponse, NoteUpdateRequest
 from app.services.note_service import NoteService
-from app.utils.pagination import Page, PaginationParams
+from app.utils.pagination import Page, PaginationParams, build_page
 
 router = APIRouter(prefix="/notes", tags=["notes"])
 
@@ -33,11 +33,8 @@ async def list_notes(
         sort=sort,
         order=order,
     )
-    return Page(
-        items=[NoteResponse.model_validate(note) for note in items],
-        total=total,
-        page=pagination.page,
-        page_size=pagination.page_size,
+    return build_page(
+        [NoteResponse.model_validate(note) for note in items], total, pagination
     )
 
 

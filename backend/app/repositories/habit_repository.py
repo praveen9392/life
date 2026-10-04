@@ -45,6 +45,20 @@ class HabitRepository(BaseRepository[Habit]):
         await self.session.flush()
         return log
 
+    async def delete_log(self, habit_id: uuid.UUID, user_id: uuid.UUID, log_date: date) -> bool:
+        """Delete the log for (habit, user, date) if one exists.
+
+        Idempotent by design - deleting a nonexistent log is a no-op that
+        returns False, not an error. Ownership is scoped inside the query
+        via `get_log`, exactly like `upsert_log`.
+        """
+        existing = await self.get_log(habit_id, user_id, log_date)
+        if existing is None:
+            return False
+        await self.session.delete(existing)
+        await self.session.flush()
+        return True
+
     async def list_logs_between(
         self, user_id: uuid.UUID, start: date, end: date, *, habit_ids: list[uuid.UUID] | None = None
     ) -> list[HabitLog]:

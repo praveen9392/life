@@ -99,3 +99,25 @@ class StorageService:
         if self._public_base_url:
             return f"{self._public_base_url.rstrip('/')}/{key}"
         return f"/{self._bucket}/{key}"
+
+    def delete_user_avatars(self, user_id: uuid.UUID) -> int:
+        """Delete every object under the user's `avatars/{user_id}/` prefix.
+
+        Used by account deletion so no personal file lingers at a public URL.
+        Returns the number of objects deleted; returns 0 (and logs the
+        underlying error) when storage is unconfigured or the call fails -
+        callers treat this as best-effort, never fatal.
+        """
+        if not self._configured or self._client is None:
+            return 0
+        deleted = 0
+        try:
+            paginator = self._client.get_paginator("list_objects_v2")
+            for page in paginator.paginate(Bucket=self._bucket, Prefix=f"avatars/{user_id}/"):
+                keys = [{"Key": obj["Key"]} for obj in page.get("Contents", [])]
+                if keys:
+                    self._client.delete_objects(Bucket=self._bucket, Delete={"Objects": keys})
+                    deleted += len(keys)
+        except (BotoCoreError, ClientError) as exc:
+            logger.error("avatar_delete_failed", user_id=str(user_id), error=str(exc))
+        return deleted

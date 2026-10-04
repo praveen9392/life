@@ -15,7 +15,7 @@ from app.schemas.workout import (
     WorkoutUpdateRequest,
 )
 from app.services.workout_service import WorkoutService
-from app.utils.pagination import Page, PaginationParams
+from app.utils.pagination import Page, PaginationParams, build_page
 
 router = APIRouter(tags=["workouts"])
 
@@ -103,11 +103,8 @@ async def list_sessions(
     items, total = await service.list_sessions(
         current_user.id, offset=pagination.offset, limit=pagination.page_size
     )
-    return Page(
-        items=[WorkoutSessionResponse.model_validate(session) for session in items],
-        total=total,
-        page=pagination.page,
-        page_size=pagination.page_size,
+    return build_page(
+        [WorkoutSessionResponse.model_validate(session) for session in items], total, pagination
     )
 
 

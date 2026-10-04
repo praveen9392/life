@@ -10,7 +10,7 @@ from app.repositories.task_repository import SortOrder, TaskSortField
 from app.schemas.task import TaskCreateRequest, TaskResponse, TaskUpdateRequest
 from app.services.task_service import TaskService
 from app.utils.enums import TaskList, TaskPriority, TaskStatus
-from app.utils.pagination import Page, PaginationParams
+from app.utils.pagination import Page, PaginationParams, build_page
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
@@ -50,11 +50,8 @@ async def list_tasks(
         order=order,
         user_timezone=current_user.timezone,
     )
-    return Page(
-        items=[TaskResponse.model_validate(task) for task in items],
-        total=total,
-        page=pagination.page,
-        page_size=pagination.page_size,
+    return build_page(
+        [TaskResponse.model_validate(task) for task in items], total, pagination
     )
 
 

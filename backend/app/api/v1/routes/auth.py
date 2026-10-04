@@ -91,7 +91,9 @@ async def logout(
 
 
 @router.post("/logout-all", response_model=MessageResponse)
+@limiter.limit("10/minute")
 async def logout_all(
+    request: Request,
     response: Response,
     current_user: CurrentUser,
     db: DbSession,

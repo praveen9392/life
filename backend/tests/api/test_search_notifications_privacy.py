@@ -112,8 +112,22 @@ async def test_privacy_delete_removes_account_and_data(api_client: AsyncClient, 
     await api_client.post(
         "/api/v1/tasks", json={"title": "Soon gone"}, headers=csrf_headers(api_client)
     )
-    deleted = await api_client.delete("/api/v1/privacy/account", headers=csrf_headers(api_client))
-    assert deleted.status_code == 204
+    # Deletion requires re-auth: a wrong password is rejected.
+    wrong_password = await api_client.request(
+        "DELETE",
+        "/api/v1/privacy/account",
+        json={"current_password": "not-the-right-password"},
+        headers=csrf_headers(api_client),
+    )
+    assert wrong_password.status_code == 401
+
+    deleted = await api_client.request(
+        "DELETE",
+        "/api/v1/privacy/account",
+        json={"current_password": "correct-horse-battery"},
+        headers=csrf_headers(api_client),
+    )
+    assert deleted.status_code == 204, deleted.text
 
     # The session is dead: subsequent authenticated calls fail.
     assert (await api_client.get("/api/v1/tasks")).status_code == 401

@@ -28,3 +28,12 @@ class Page(BaseModel, Generic[T]):
     total: int
     page: int
     page_size: int
+
+
+def build_page(items: list[T], total: int, params: PaginationParams) -> Page[T]:
+    """Assemble the standard `Page` envelope for a serialized item list.
+
+    Shared by every paginated list route so the `page`/`page_size` echo
+    can't drift per endpoint.
+    """
+    return Page(items=items, total=total, page=params.page, page_size=params.page_size)

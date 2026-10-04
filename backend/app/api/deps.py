@@ -51,11 +51,5 @@ async def get_current_user(
     return user
 
 
-def get_refresh_token_from_cookie(request: Request) -> str | None:
-    """The raw refresh token, read from its httpOnly cookie (may be absent)."""
-    settings = get_settings()
-    return request.cookies.get(settings.refresh_cookie_name)
-
-
 CurrentUser = Annotated[User, Depends(get_current_user)]
 DbSession = Annotated[AsyncSession, Depends(get_db)]

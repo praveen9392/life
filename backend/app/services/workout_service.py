@@ -130,9 +130,11 @@ class WorkoutService:
         self, user_id: uuid.UUID, payload: WorkoutSessionCreateRequest
     ) -> None:
         """Sets may only reference exercises the user can see (shared or own)."""
+        # One batched query rather than one round-trip per set (N+1).
+        exercise_ids = {set_input.exercise_id for set_input in payload.sets}
+        visible = await self.exercises.get_visible_many(exercise_ids, user_id)
         for set_input in payload.sets:
-            exercise = await self.exercises.get_visible(set_input.exercise_id, user_id)
-            if exercise is None:
+            if set_input.exercise_id not in visible:
                 raise ValidationError(
                     "Unknown exercise", fields={"exercise_id": str(set_input.exercise_id)}
                 )

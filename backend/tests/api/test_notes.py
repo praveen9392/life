@@ -53,6 +53,24 @@ async def test_pinned_notes_sort_first(api_client: AsyncClient, user_a) -> None:
     assert listed.json()["items"][0]["id"] == pinned["id"]
 
 
+async def test_note_list_sorts_by_title_and_rejects_invalid_sort(api_client: AsyncClient, user_a) -> None:  # type: ignore[no-untyped-def]
+    await _create_note(api_client, "Banana")
+    await _create_note(api_client, "Cherry")
+    await _create_note(api_client, "Apple")
+
+    ascending = await api_client.get("/api/v1/notes", params={"sort": "title", "order": "asc"})
+    assert ascending.status_code == 200
+    assert [note["title"] for note in ascending.json()["items"]] == ["Apple", "Banana", "Cherry"]
+
+    descending = await api_client.get("/api/v1/notes", params={"sort": "title", "order": "desc"})
+    assert descending.status_code == 200
+    assert [note["title"] for note in descending.json()["items"]] == ["Cherry", "Banana", "Apple"]
+
+    # Whitelisted fields only (created_at/updated_at/title) - anything else 422s.
+    bad_sort = await api_client.get("/api/v1/notes", params={"sort": "content"})
+    assert bad_sort.status_code == 422
+
+
 async def test_archived_notes_hidden_from_default_list(api_client: AsyncClient, user_a) -> None:  # type: ignore[no-untyped-def]
     note = await _create_note(api_client, "Old note")
     archived = await api_client.patch(

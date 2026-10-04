@@ -19,6 +19,18 @@ from app.core.config import get_settings
 
 _SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 
+# Paths that must stay reachable even when a stale refresh/access cookie
+# exists but the csrf_token cookie is gone (per-cookie eviction is not
+# atomic): login/register mint a fresh session anyway, and a CSRF-forged
+# logout can at most end the current session - which the victim wants gone
+# anyway if their cookies are in a weird state. Refresh stays protected:
+# it is the rotation endpoint the check was added for.
+_CSRF_EXEMPT_PATHS = {
+    "/api/v1/auth/login",
+    "/api/v1/auth/register",
+    "/api/v1/auth/logout",
+}
+
 
 class RequestIDMiddleware(BaseHTTPMiddleware):
     """Attach a unique `X-Request-ID` to every request/response for log correlation."""
@@ -52,10 +64,20 @@ class CSRFMiddleware(BaseHTTPMiddleware):
         if request.method in _SAFE_METHODS:
             return await call_next(request)
 
+        if request.url.path in _CSRF_EXEMPT_PATHS:
+            return await call_next(request)
+
         session_cookie = request.cookies.get(settings.access_cookie_name)
-        if session_cookie is None:
+        refresh_cookie = request.cookies.get(settings.refresh_cookie_name)
+        if session_cookie is None and refresh_cookie is None:
             # No session yet (e.g. login/register itself) - nothing to forge.
             return await call_next(request)
+
+        # The refresh cookie alone still authenticates /auth/refresh and
+        # /auth/logout: browsers keep sending it after the short-lived access
+        # cookie expires, so refresh-cookie-only requests must pass the same
+        # CSRF check (otherwise a cross-site POST could force-rotate - i.e.
+        # revoke - a victim's refresh token, a logout-everywhere DoS).
 
         csrf_cookie = request.cookies.get(settings.csrf_cookie_name)
         csrf_header = request.headers.get("X-CSRF-Token")

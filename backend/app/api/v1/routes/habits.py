@@ -98,6 +98,18 @@ async def log_habit(
     return HabitLogResponse.model_validate(log)
 
 
+@router.delete("/{habit_id}/log/{log_date}", status_code=204)
+async def unlog_habit(
+    habit_id: uuid.UUID,
+    log_date: date,
+    current_user: CurrentUser,
+    db: DbSession,
+) -> None:
+    """Clear a log entry - idempotent: deleting a nonexistent log is a no-op."""
+    service = HabitService(db)
+    await service.delete_log(current_user.id, habit_id, log_date)
+
+
 @router.get("/{habit_id}/history", response_model=list[HabitLogResponse])
 async def habit_history(
     habit_id: uuid.UUID,

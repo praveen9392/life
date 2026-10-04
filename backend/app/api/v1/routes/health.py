@@ -9,7 +9,7 @@ from app.api.deps import CurrentUser, DbSession, get_pagination
 from app.schemas.health import HealthMetricCreateRequest, HealthMetricResponse
 from app.services.health_service import HealthService
 from app.utils.enums import HealthMetricType
-from app.utils.pagination import Page, PaginationParams
+from app.utils.pagination import Page, PaginationParams, build_page
 
 router = APIRouter(prefix="/health", tags=["health"])
 
@@ -31,11 +31,8 @@ async def list_metrics(
         offset=pagination.offset,
         limit=pagination.page_size,
     )
-    return Page(
-        items=[HealthMetricResponse.model_validate(metric) for metric in items],
-        total=total,
-        page=pagination.page,
-        page_size=pagination.page_size,
+    return build_page(
+        [HealthMetricResponse.model_validate(metric) for metric in items], total, pagination
     )
 
 

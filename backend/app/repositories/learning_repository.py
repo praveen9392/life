@@ -52,11 +52,15 @@ class CourseRepository(BaseRepository[Course]):
         )
         return (await self.session.execute(query)).scalar_one_or_none()
 
-    async def list_for_user(self, user_id: uuid.UUID) -> list[Course]:
+    async def list_for_user(
+        self, user_id: uuid.UUID, *, offset: int = 0, limit: int = 100
+    ) -> list[Course]:
         query = (
             self._base_query(user_id)
             .options(selectinload(Course.modules).selectinload(CourseModule.lessons))
             .order_by(Course.created_at.desc())
+            .offset(offset)
+            .limit(limit)
         )
         return list((await self.session.execute(query)).scalars().all())
 

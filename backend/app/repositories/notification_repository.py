@@ -3,7 +3,7 @@
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 
 from app.models.notification import Notification
 from app.repositories.base import BaseRepository
@@ -37,11 +37,14 @@ class NotificationRepository(BaseRepository[Notification]):
         return int((await self.session.execute(query)).scalar_one())
 
     async def mark_all_read(self, user_id: uuid.UUID) -> int:
-        rows = await self.list_for_user(user_id, unread_only=True, limit=1000)
-        for notification in rows:
-            notification.is_read = True
-        await self.session.flush()
-        return len(rows)
+        # One UPDATE covers every unread row - paging SELECTs + ORM writes
+        # would need N round-trips and could still race new inserts.
+        result = await self.session.execute(
+            update(Notification)
+            .where(Notification.user_id == user_id, Notification.is_read.is_(False))
+            .values(is_read=True)
+        )
+        return result.rowcount
 
     async def create_notification(self, user_id: uuid.UUID, **fields: object) -> Notification:
         # `created_at` is set explicitly here rather than relying on the

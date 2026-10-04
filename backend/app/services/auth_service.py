@@ -90,6 +90,11 @@ class AuthService:
         if user is None or not user.is_active:
             raise UnauthorizedError("Invalid session")
 
+        # Refresh is the only guaranteed periodic touchpoint per session, so
+        # it doubles as the cleanup hook: one indexed DELETE drops this user's
+        # already-expired token rows instead of letting them accumulate.
+        await self.users.delete_expired_tokens(user.id)
+
         await self.users.revoke_refresh_token(stored.id)
         new_raw_token = await self._issue_refresh_token(
             user,

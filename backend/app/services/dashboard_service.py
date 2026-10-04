@@ -13,6 +13,7 @@ from app.repositories.habit_repository import HabitRepository
 from app.repositories.note_repository import NoteRepository
 from app.repositories.task_repository import TaskRepository
 from app.schemas.dashboard import DashboardSummary, HabitTodayStatus
+from app.schemas.habit import HabitResponse
 from app.schemas.task import TaskResponse
 from app.services.habit_service import HabitService
 from app.services.progress_rules import daily_progress_percent
@@ -27,14 +28,22 @@ class DashboardService:
         self.habits = HabitRepository(session)
         self.tasks = TaskRepository(session)
         self.notes = NoteRepository(session)
+        self.habit_service = HabitService(session)
 
     async def build_summary(self, user_id: uuid.UUID, user_timezone: str) -> DashboardSummary:
         today = today_for_user(user_timezone)
         week_start, week_end = week_bounds_for_user(today)
 
         habits = await self.habits.list_active(user_id)
-        habit_service = HabitService(self.session)
-        logs = await self.habits.list_logs_between(user_id, week_start, week_end)
+        habit_service = self.habit_service
+        # Streaks must span each habit's full history: bounding the log window
+        # to the current week truncates any streak that started in a prior
+        # week (a 10-day streak reported <= 7). One query covers every
+        # habit's whole logged range; the week map below is a strict subset.
+        # End bound is `today` (not week_end) to match get_streak semantics -
+        # future-dated logs never count.
+        streak_window_start = min((habit.start_date for habit in habits), default=today)
+        logs = await self.habits.list_logs_between(user_id, streak_window_start, today)
 
         logs_by_habit_day: dict[uuid.UUID, dict[date, HabitLogStatus]] = {}
         for log in logs:
@@ -52,7 +61,7 @@ class DashboardService:
                     habits_completed_today += 1
             habit_statuses.append(
                 HabitTodayStatus(
-                    habit=habit,
+                    habit=HabitResponse.model_validate(habit),
                     is_due=is_due,
                     status=status.value if status else None,
                 )
@@ -61,17 +70,18 @@ class DashboardService:
         tasks_today, _ = await self.tasks.list_for_user(
             user_id, status=None, task_list=None, due_on=today, limit=50
         )
+        # Upcoming = future due dates only (today's and overdue have own
+        # widgets). `due_from` pushes that predicate into SQL so the 20-row
+        # window isn't under-filled by overdue/today rows filtered out after
+        # the fact.
         tasks_upcoming, _ = await self.tasks.list_for_user(
             user_id,
             status=TaskStatus.PENDING,
             task_list=None,
+            due_from=today + timedelta(days=1),
             due_before=today + timedelta(days=7),
             limit=20,
         )
-        # Upcoming = future due dates only (today's and overdue have own widgets).
-        tasks_upcoming = [
-            task for task in tasks_upcoming if task.due_date is not None and task.due_date > today
-        ]
         tasks_overdue = await self.tasks.list_overdue(user_id, today, limit=20)
 
         tasks_due_today = len(tasks_today)

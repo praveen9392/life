@@ -30,6 +30,35 @@ async def test_exercise_create_and_list(api_client: AsyncClient, user_a) -> None
     assert any(item["id"] == exercise["id"] for item in searched.json())
 
 
+async def test_exercise_list_pagination(api_client: AsyncClient, user_a) -> None:  # type: ignore[no-untyped-def]
+    """`offset`/`limit` slice the visible exercise list (shared catalog + own).
+
+    Compared against a full (unpaged) fetch rather than fixed positions so the
+    test is robust whether or not the shared catalog is seeded.
+    """
+    await _create_exercise(api_client, "Pagination exercise A")
+    await _create_exercise(api_client, "Pagination exercise B")
+
+    full = await api_client.get("/api/v1/exercises", params={"limit": 500})
+    assert full.status_code == 200
+    all_ids = [exercise["id"] for exercise in full.json()]
+    assert len(all_ids) >= 2
+
+    first_page = await api_client.get("/api/v1/exercises", params={"limit": 1})
+    assert [exercise["id"] for exercise in first_page.json()] == all_ids[:1]
+
+    middle = await api_client.get("/api/v1/exercises", params={"offset": 1, "limit": 2})
+    assert [exercise["id"] for exercise in middle.json()] == all_ids[1:3]
+
+    beyond = await api_client.get("/api/v1/exercises", params={"offset": len(all_ids) + 10})
+    assert beyond.status_code == 200
+    assert beyond.json() == []
+
+    # Bounds are validated: limit >= 1 and <= 500.
+    assert (await api_client.get("/api/v1/exercises", params={"limit": 0})).status_code == 422
+    assert (await api_client.get("/api/v1/exercises", params={"limit": 501})).status_code == 422
+
+
 async def test_workout_session_with_sets(api_client: AsyncClient, user_a) -> None:  # type: ignore[no-untyped-def]
     exercise = await _create_exercise(api_client)
     workout = (

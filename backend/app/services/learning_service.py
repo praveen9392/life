@@ -78,8 +78,10 @@ class LearningService:
             raise ValidationError("target_date cannot be before start_date")
         return await self.courses.create_owned(user_id, **payload.model_dump())
 
-    async def list_courses(self, user_id: uuid.UUID) -> list[Course]:
-        return await self.courses.list_for_user(user_id)
+    async def list_courses(
+        self, user_id: uuid.UUID, *, offset: int = 0, limit: int = 100
+    ) -> list[Course]:
+        return await self.courses.list_for_user(user_id, offset=offset, limit=limit)
 
     async def get_course_tree(self, user_id: uuid.UUID, course_id: uuid.UUID) -> Course:
         course = await self.courses.get_owned_with_tree(course_id, user_id)
@@ -90,11 +92,20 @@ class LearningService:
     async def update_course(
         self, user_id: uuid.UUID, course_id: uuid.UUID, payload: CourseUpdateRequest
     ) -> Course:
-        course = await self.courses.update_owned(
-            course_id, user_id, **payload.model_dump(exclude_unset=True)
-        )
+        course = await self.courses.get_owned(course_id, user_id)
         if course is None:
             raise NotFoundError("Course not found")
+        changes = payload.model_dump(exclude_unset=True)
+        # Validate the EFFECTIVE pair: a partial update may change only one
+        # of the dates, so the other side comes from the stored course.
+        start_date = changes.get("start_date", course.start_date)
+        target_date = changes.get("target_date", course.target_date)
+        if start_date and target_date and target_date < start_date:
+            raise ValidationError("target_date cannot be before start_date")
+        for key, value in changes.items():
+            setattr(course, key, value)
+        await self.session.flush()
+        await self.session.refresh(course)
         return course
 
     async def delete_course(self, user_id: uuid.UUID, course_id: uuid.UUID) -> None:

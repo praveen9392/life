@@ -6,6 +6,7 @@ from fastapi import APIRouter, File, Request, Response, UploadFile
 
 from app.api.deps import CurrentUser, DbSession
 from app.core.config import get_settings
+from app.core.rate_limit import limiter
 from app.core.security import hash_refresh_token
 from app.schemas.auth import MessageResponse
 from app.schemas.user import PasswordChangeRequest, SessionResponse, UserResponse, UserUpdateRequest
@@ -63,7 +64,9 @@ async def complete_onboarding(
 
 
 @router.post("/me/password", response_model=MessageResponse)
+@limiter.limit("5/minute")
 async def change_password(
+    request: Request,
     payload: PasswordChangeRequest,
     current_user: CurrentUser,
     response: Response,

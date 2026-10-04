@@ -43,8 +43,12 @@ def create_app() -> FastAPI:
         CORSMiddleware,
         allow_origins=settings.allowed_origins,
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        # Explicit allowlist: the full method set the API uses, plus only the
+        # request headers the frontend actually sends (cookie auth - no
+        # Authorization header; CSRF via X-CSRF-Token; X-Request-ID is read
+        # by RequestIDMiddleware when clients opt into supplying one).
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["Content-Type", "X-CSRF-Token", "X-Request-ID"],
     )
     app.add_middleware(CSRFMiddleware)
     app.add_middleware(SecurityHeadersMiddleware)

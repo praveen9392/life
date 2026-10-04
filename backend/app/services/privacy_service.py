@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import Select
 from sqlalchemy.sql.elements import ColumnElement
 
+from app.core.logging import get_logger
 from app.models.goal import Goal, GoalMilestone
 from app.models.habit import Habit, HabitLog
 from app.models.health import HealthMetric
@@ -28,6 +29,8 @@ from app.models.tag import Tag
 from app.models.task import Task
 from app.models.user import RefreshToken, User
 from app.models.workout import Exercise, Workout, WorkoutSession, WorkoutSet
+
+logger = get_logger(__name__)
 
 
 def _serialize(value: Any) -> Any:
@@ -147,3 +150,13 @@ class PrivacyService:
         await self.session.execute(delete(RefreshToken).where(RefreshToken.user_id == user_id))
         await self.session.execute(delete(User).where(User.id == user_id))
         await self.session.flush()
+
+        # Best-effort: purge the user's avatar objects so no personal file
+        # lingers at a public URL after "permanent" deletion. Storage is
+        # optional infra - a failure here is logged, never fatal.
+        try:
+            from app.services.storage_service import StorageService
+
+            StorageService().delete_user_avatars(user_id)
+        except Exception as exc:  # noqa: BLE001 - deletion must not fail on storage
+            logger.warning("avatar_cleanup_failed", user_id=str(user_id), error=str(exc))

@@ -23,7 +23,7 @@ from app.schemas.learning import (
     ModuleResponse,
 )
 from app.services.learning_service import LearningService, course_progress
-from app.utils.pagination import Page, PaginationParams
+from app.utils.pagination import Page, PaginationParams, build_page
 
 router = APIRouter(prefix="/learning", tags=["learning"])
 
@@ -76,8 +76,13 @@ async def delete_item(item_id: uuid.UUID, current_user: CurrentUser, db: DbSessi
 
 
 @router.get("/courses", response_model=list[CourseResponse])
-async def list_courses(current_user: CurrentUser, db: DbSession) -> list[CourseResponse]:
-    courses = await LearningService(db).list_courses(current_user.id)
+async def list_courses(
+    current_user: CurrentUser,
+    db: DbSession,
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=100, ge=1, le=500),
+) -> list[CourseResponse]:
+    courses = await LearningService(db).list_courses(current_user.id, offset=offset, limit=limit)
     return [_course_response(course, course_progress(course)) for course in courses]
 
 
@@ -162,11 +167,8 @@ async def list_sessions(
     items, total = await LearningService(db).list_sessions(
         current_user.id, since=since, offset=pagination.offset, limit=pagination.page_size
     )
-    return Page(
-        items=[LearningSessionResponse.model_validate(session) for session in items],
-        total=total,
-        page=pagination.page,
-        page_size=pagination.page_size,
+    return build_page(
+        [LearningSessionResponse.model_validate(session) for session in items], total, pagination
     )
 
 

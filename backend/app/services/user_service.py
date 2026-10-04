@@ -15,9 +15,6 @@ class UserService:
         self.session = session
         self.users = UserRepository(session)
 
-    async def get_profile(self, user: User) -> User:
-        return user
-
     async def update_profile(self, user: User, changes: UserUpdateRequest) -> User:
         """Apply a profile update. Only whitelisted fields from the request
         schema are ever touched (mass-assignment safe by construction)."""

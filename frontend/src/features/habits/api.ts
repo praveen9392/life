@@ -60,6 +60,8 @@ export const habitsApi = {
   remove: (habitId: string) => httpClient.delete(`/api/v1/habits/${habitId}`),
   log: (habitId: string, logDate: string, status: HabitLogStatus, note?: string) =>
     httpClient.put<HabitLog>(`/api/v1/habits/${habitId}/log/${logDate}`, { status, note }),
+  removeLog: (habitId: string, logDate: string) =>
+    httpClient.delete(`/api/v1/habits/${habitId}/log/${logDate}`),
   history: (habitId: string, days = 30) =>
     httpClient.get<HabitLog[]>(`/api/v1/habits/${habitId}/history?days=${days}`),
   streak: (habitId: string) => httpClient.get<Streak>(`/api/v1/habits/${habitId}/streak`),

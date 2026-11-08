@@ -3,12 +3,13 @@
 import uuid
 from typing import Any, Literal
 
-from sqlalchemy import Select, delete, func, select
+from sqlalchemy import Select, delete, func, select, update
 from sqlalchemy.orm import selectinload
 
 from app.models.note import Note
 from app.models.tag import NoteTag
 from app.repositories.base import BaseRepository
+from app.utils.sql import escape_like
 
 NoteSortField = Literal["created_at", "updated_at", "title"]
 SortOrder = Literal["asc", "desc"]
@@ -28,19 +29,20 @@ class NoteRepository(BaseRepository[Note]):
         )
 
     def _order_by_clause(self, sort: NoteSortField | None, order: SortOrder) -> tuple[Any, ...]:
-        """The default pinned-first ordering is preserved when `sort` is
-        omitted (backward compatible)."""
+        """Pinned notes always sort first; the default (no `sort`) ordering is
+        pinned-first/updated-at, and explicit sorts keep the pinned prefix."""
+        pinned_first = (Note.is_pinned.desc(),)
         if sort is None:
-            return (Note.is_pinned.desc(), Note.updated_at.desc())
+            return pinned_first + (Note.updated_at.desc(),)
         descending = order == "desc"
         column: Any = {
             "created_at": Note.created_at,
             "updated_at": Note.updated_at,
             "title": Note.title,
         }[sort]
-        return (column.desc() if descending else column.asc(),)
+        return pinned_first + (column.desc() if descending else column.asc(),)
 
-    async def list_for_user(
+    async def list_for_user_query(
         self,
         user_id: uuid.UUID,
         *,
@@ -49,10 +51,19 @@ class NoteRepository(BaseRepository[Note]):
         limit: int = 20,
         sort: NoteSortField | None = None,
         order: SortOrder = "desc",
+        directory_id: uuid.UUID | None = None,
+        unfiled_only: bool = False,
     ) -> tuple[list[Note], int]:
+        """Return (page, total) of the user's non-archived notes with tags, pinned first,
+        filtered by title search / directory (or unfiled) and sorted per `sort`/`order`.
+        """
         query = self._base_query(user_id)
         if search:
-            query = query.where(Note.title.ilike(f"%{search}%"))
+            query = query.where(Note.title.ilike(f"%{escape_like(search)}%", escape="\\"))
+        if directory_id is not None:
+            query = query.where(Note.directory_id == directory_id)
+        elif unfiled_only:
+            query = query.where(Note.directory_id.is_(None))
         query = query.order_by(*self._order_by_clause(sort, order))
 
         count_query = select(func.count()).select_from(query.order_by(None).subquery())
@@ -60,11 +71,32 @@ class NoteRepository(BaseRepository[Note]):
         rows = (await self.session.execute(query.offset(offset).limit(limit))).scalars().all()
         return list(rows), total
 
-    async def count_recent(self, user_id: uuid.UUID, *, limit: int = 5) -> int:
-        query = select(func.count()).select_from(self._base_query(user_id).limit(limit).subquery())
-        return (await self.session.execute(query)).scalar_one()
+    async def move_notes_query(
+        self, user_id: uuid.UUID, note_ids: list[uuid.UUID], directory_id: uuid.UUID | None
+    ) -> int:
+        """Move the owned, non-deleted notes in `note_ids` into `directory_id` (None = unfiled),
+        returning how many were moved; foreign/missing ids are silently dropped by the
+        ownership-scoped UPDATE."""
+        result = await self.session.execute(
+            update(Note)
+            .where(
+                Note.id.in_(note_ids),
+                Note.user_id == user_id,
+                Note.deleted_at.is_(None),
+            )
+            .values(directory_id=directory_id)
+            .execution_options(synchronize_session=False)
+        )
+        return result.rowcount
 
-    async def set_tags(self, note_id: uuid.UUID, tag_ids: list[uuid.UUID]) -> None:
+    async def count_recent_query(self, user_id: uuid.UUID, *, limit: int = 5) -> int:
+        """Count how many of the user's `limit` most recent notes are non-archived (dashboard tile)."""
+        query = select(func.count()).select_from(self._base_query(user_id).limit(limit).subquery())
+        query_result = await self.session.execute(query)
+        scalar_value = query_result.scalar_one()
+        return scalar_value
+
+    async def set_tags_query(self, note_id: uuid.UUID, tag_ids: list[uuid.UUID]) -> None:
         """Replace a note's tag associations with exactly `tag_ids`."""
         await self.session.execute(delete(NoteTag).where(NoteTag.note_id == note_id))
         for tag_id in tag_ids:

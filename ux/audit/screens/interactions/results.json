@@ -1,0 +1,262 @@
+{
+  "results": [
+    {
+      "name": "login-desktop",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "name": "login-empty-submit",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "name": "login-wrong-password",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "name": "register-desktop",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "name": "register-empty-submit",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "name": "protected-redirect",
+      "ok": true,
+      "note": "landed on /login"
+    },
+    {
+      "name": "login-mobile",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "name": "register-mobile",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "name": "d-bell-open",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "name": "d-usermenu-open",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "name": "d-search-1char",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "name": "d-search-results",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "name": "d-search-noresult",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "name": "d-cmdk",
+      "ok": true,
+      "note": "focused: Search tasks, habits, notes…"
+    },
+    {
+      "name": "d-quickadd",
+      "ok": true,
+      "note": "url /app/tasks?new=1"
+    },
+    {
+      "name": "d-task-modal-empty-submit",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "name": "d-task-delete-confirm",
+      "ok": true,
+      "note": "dialog visible: true"
+    },
+    {
+      "name": "d-task-filter-url",
+      "ok": true,
+      "note": "/app/tasks?status=pending"
+    },
+    {
+      "name": "d-tasks-search",
+      "ok": false,
+      "note": "locator.fill: Error: strict mode violation: getByPlaceholder(/search tasks/i) resolved to 2 elements:"
+    },
+    {
+      "name": "d-habits-heatmap",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "name": "d-habit-newmodal",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "name": "d-notes-preview",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "name": "d-notes-expand",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "name": "d-health-all",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "name": "d-health-empty-submit",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "name": "d-workout-modal",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "name": "d-learning-expand",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "name": "d-goals-newmodal",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "name": "d-calendar-week",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "name": "d-calendar-day",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "name": "d-calendar-click-day",
+      "ok": false,
+      "note": "locator.click: Timeout 3000ms exceeded."
+    },
+    {
+      "name": "d-analytics-settled",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "name": "d-analytics-month",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "name": "d-sidebar-collapsed",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "name": "d-keyboard-tab-focus",
+      "ok": true,
+      "note": "focus: A Notes"
+    },
+    {
+      "name": "d-404",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "name": "d-profile-bottom",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "name": "d-dark-toggle",
+      "ok": false,
+      "note": "locator.click: Timeout 6000ms exceeded."
+    },
+    {
+      "name": "d-dark_app",
+      "ok": true,
+      "note": "data-theme=light"
+    },
+    {
+      "name": "d-dark_app_habits",
+      "ok": true,
+      "note": "data-theme=light"
+    },
+    {
+      "name": "d-dark_app_tasks",
+      "ok": true,
+      "note": "data-theme=light"
+    },
+    {
+      "name": "d-dark_app_analytics",
+      "ok": true,
+      "note": "data-theme=light"
+    },
+    {
+      "name": "m-more-sheet",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "name": "m-search-overlay",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "name": "m-task-modal",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "name": "m-workouts",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "name": "m-calendar",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "name": "m-analytics",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "name": "m-notes-open-note",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "name": "m-profile-logout",
+      "ok": true,
+      "note": "logout btn visible: true"
+    }
+  ],
+  "consoleErrors": [
+    "http://localhost:5175/login :: Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+    "http://localhost:5175/app/tasks :: Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+  ],
+  "failedRequests": [
+    "401 POST http://localhost:8002/api/v1/auth/login",
+    "401 GET http://localhost:8002/api/v1/users/me"
+  ]
+}

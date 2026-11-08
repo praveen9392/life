@@ -18,6 +18,7 @@ function useInvalidateGoals() {
     void queryClient.invalidateQueries({ queryKey: GOALS_QUERY_KEY });
     void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
     void queryClient.invalidateQueries({ queryKey: ["calendar"] });
+    void queryClient.invalidateQueries({ queryKey: ["analytics"] });
   };
 }
 
@@ -25,15 +26,6 @@ export function useCreateGoal() {
   const invalidate = useInvalidateGoals();
   return useMutation({
     mutationFn: (input: Parameters<typeof goalsApi.create>[0]) => goalsApi.create(input),
-    onSuccess: invalidate,
-  });
-}
-
-export function useUpdateGoal() {
-  const invalidate = useInvalidateGoals();
-  return useMutation({
-    mutationFn: ({ goalId, input }: { goalId: string; input: Parameters<typeof goalsApi.update>[1] }) =>
-      goalsApi.update(goalId, input),
     onSuccess: invalidate,
   });
 }

@@ -279,3 +279,88 @@ async def test_task_list_filters_search_date_priority_overdue(
         "/api/v1/tasks", params={"search": "gym", "due_from": today, "status": "pending"}
     )
     assert {item["title"] for item in combined.json()["items"]} == {"Plan gym schedule"}
+
+
+async def test_recurrence_template_patch_updates_template(api_client: AsyncClient, user_a) -> None:  # type: ignore[no-untyped-def]
+    """Regression: PATCH /tasks/templates/{id} previously 500'd because
+    `recurrence_rule` was missing from TaskUpdateRequest."""
+    today = datetime.now(UTC).date()
+    created = await api_client.post(
+        "/api/v1/tasks",
+        json={
+            "title": "Daily standup",
+            "due_date": today.isoformat(),
+            "recurrence_rule": {"frequency": "daily"},
+        },
+        headers=csrf_headers(api_client),
+    )
+    assert created.status_code == 201, created.text
+    template_id = created.json()["recurrence_template_id"]
+    assert template_id is not None
+
+    # A plain body update works.
+    renamed = await api_client.patch(
+        f"/api/v1/tasks/templates/{template_id}",
+        json={"title": "Renamed standup"},
+        headers=csrf_headers(api_client),
+    )
+    assert renamed.status_code == 200, renamed.text
+    assert renamed.json()["title"] == "Renamed standup"
+    assert renamed.json()["is_recurring_template"] is True
+
+    # ...and so does replacing the recurrence rule itself.
+    re_ruled = await api_client.patch(
+        f"/api/v1/tasks/templates/{template_id}",
+        json={"recurrence_rule": {"frequency": "weekly", "weekdays": [0]}},
+        headers=csrf_headers(api_client),
+    )
+    assert re_ruled.status_code == 200, re_ruled.text
+    assert re_ruled.json()["recurrence_rule"]["frequency"] == "weekly"
+
+    # Weekly without weekdays is a service-level validation error, not a crash.
+    invalid = await api_client.patch(
+        f"/api/v1/tasks/templates/{template_id}",
+        json={"recurrence_rule": {"frequency": "weekly", "weekdays": []}},
+        headers=csrf_headers(api_client),
+    )
+    assert invalid.status_code == 422
+
+
+async def test_task_list_sorts_by_due_date(api_client: AsyncClient, user_a) -> None:  # type: ignore[no-untyped-def]
+    headers = csrf_headers(api_client)
+    await api_client.post(
+        "/api/v1/tasks", json={"title": "Due later", "due_date": "2025-01-05"}, headers=headers
+    )
+    await api_client.post(
+        "/api/v1/tasks", json={"title": "Undated"}, headers=headers
+    )
+    await api_client.post(
+        "/api/v1/tasks", json={"title": "Due earlier", "due_date": "2025-01-01"}, headers=headers
+    )
+
+    ascending = await api_client.get("/api/v1/tasks", params={"sort": "due_date", "order": "asc"})
+    assert ascending.status_code == 200
+    # Undated tasks always sort last, regardless of direction.
+    assert [task["title"] for task in ascending.json()["items"]] == [
+        "Due earlier",
+        "Due later",
+        "Undated",
+    ]
+
+    descending = await api_client.get("/api/v1/tasks", params={"sort": "due_date", "order": "desc"})
+    assert descending.status_code == 200
+    assert [task["title"] for task in descending.json()["items"]] == [
+        "Due later",
+        "Due earlier",
+        "Undated",
+    ]
+
+
+async def test_task_list_rejects_invalid_sort_params(api_client: AsyncClient, user_a) -> None:  # type: ignore[no-untyped-def]
+    bad_sort = await api_client.get("/api/v1/tasks", params={"sort": "title"})
+    assert bad_sort.status_code == 422
+
+    bad_order = await api_client.get(
+        "/api/v1/tasks", params={"sort": "due_date", "order": "sideways"}
+    )
+    assert bad_order.status_code == 422

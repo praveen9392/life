@@ -7,6 +7,11 @@
 @layer base {
   html {
     @apply bg-bg text-text antialiased;
+    /* Pin text size: mobile browsers' font-inflation pass would otherwise
+       enlarge text unpredictably on narrow viewports (and reflow layouts
+       asynchronously). */
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
   }
   body {
     @apply min-h-screen font-sans;

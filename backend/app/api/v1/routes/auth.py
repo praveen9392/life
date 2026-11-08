@@ -5,11 +5,13 @@ response. All business logic (and every security decision) lives in the
 service layer.
 """
 
-from fastapi import APIRouter, Request, Response
+from fastapi import APIRouter, HTTPException, Request, Response, status
+from sqlalchemy.exc import SQLAlchemyError
 
+from app.api.cookies import clear_auth_cookies, set_auth_cookies
 from app.api.deps import CurrentUser, DbSession
 from app.core.config import get_settings
-from app.core.exceptions import UnauthorizedError
+from app.core.exceptions import AppException, UnauthorizedError
 from app.core.rate_limit import limiter
 from app.schemas.auth import AuthResponse, LoginRequest, MessageResponse, RegisterRequest
 from app.schemas.user import UserResponse
@@ -30,13 +32,21 @@ async def register(
     response: Response,
     db: DbSession,
 ) -> AuthResponse:
-    service = AuthService(db)
-    user = await service.register(payload.email, payload.password, payload.full_name)
-    _, raw_refresh = await service.login(
-        payload.email, payload.password, user_agent=request.headers.get("user-agent"), ip_address=_client_ip(request)
-    )
-    service.set_auth_cookies(response, user.id, raw_refresh)
-    return AuthResponse(user=UserResponse.model_validate(user))
+    try:
+        service = AuthService(db)
+        user = await service.register(payload.email, payload.password, payload.full_name)
+        _, raw_refresh = await service.login(
+            payload.email, payload.password, user_agent=request.headers.get("user-agent"), ip_address=_client_ip(request)
+        )
+        set_auth_cookies(response, user.id, raw_refresh)
+        return AuthResponse(user=UserResponse.model_validate(user))
+    except (AppException, SQLAlchemyError):
+        raise
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred",
+        ) from exc
 
 
 @router.post("/login", response_model=AuthResponse)
@@ -47,15 +57,23 @@ async def login(
     response: Response,
     db: DbSession,
 ) -> AuthResponse:
-    service = AuthService(db)
-    user, raw_refresh = await service.login(
-        payload.email,
-        payload.password,
-        user_agent=request.headers.get("user-agent"),
-        ip_address=_client_ip(request),
-    )
-    service.set_auth_cookies(response, user.id, raw_refresh)
-    return AuthResponse(user=UserResponse.model_validate(user))
+    try:
+        service = AuthService(db)
+        user, raw_refresh = await service.login(
+            payload.email,
+            payload.password,
+            user_agent=request.headers.get("user-agent"),
+            ip_address=_client_ip(request),
+        )
+        set_auth_cookies(response, user.id, raw_refresh)
+        return AuthResponse(user=UserResponse.model_validate(user))
+    except (AppException, SQLAlchemyError):
+        raise
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred",
+        ) from exc
 
 
 @router.post("/refresh", response_model=AuthResponse)
@@ -65,17 +83,25 @@ async def refresh(
     response: Response,
     db: DbSession,
 ) -> AuthResponse:
-    service = AuthService(db)
-    raw_token = request.cookies.get(get_settings().refresh_cookie_name)
-    if raw_token is None:
-        raise UnauthorizedError("Missing refresh token")
-    user, new_raw_refresh = await service.refresh(
-        raw_token,
-        user_agent=request.headers.get("user-agent"),
-        ip_address=_client_ip(request),
-    )
-    service.set_auth_cookies(response, user.id, new_raw_refresh)
-    return AuthResponse(user=UserResponse.model_validate(user))
+    try:
+        service = AuthService(db)
+        raw_token = request.cookies.get(get_settings().refresh_cookie_name)
+        if raw_token is None:
+            raise UnauthorizedError("Missing refresh token")
+        user, new_raw_refresh = await service.refresh(
+            raw_token,
+            user_agent=request.headers.get("user-agent"),
+            ip_address=_client_ip(request),
+        )
+        set_auth_cookies(response, user.id, new_raw_refresh)
+        return AuthResponse(user=UserResponse.model_validate(user))
+    except (AppException, SQLAlchemyError):
+        raise
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred",
+        ) from exc
 
 
 @router.post("/logout", response_model=MessageResponse)
@@ -84,19 +110,37 @@ async def logout(
     response: Response,
     db: DbSession,
 ) -> MessageResponse:
-    service = AuthService(db)
-    await service.logout(request.cookies.get(get_settings().refresh_cookie_name))
-    service.clear_auth_cookies(response)
-    return MessageResponse(message="Logged out")
+    try:
+        service = AuthService(db)
+        await service.logout(request.cookies.get(get_settings().refresh_cookie_name))
+        clear_auth_cookies(response)
+        return MessageResponse(message="Logged out")
+    except (AppException, SQLAlchemyError):
+        raise
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred",
+        ) from exc
 
 
 @router.post("/logout-all", response_model=MessageResponse)
+@limiter.limit("10/minute")
 async def logout_all(
+    request: Request,
     response: Response,
     current_user: CurrentUser,
     db: DbSession,
 ) -> MessageResponse:
-    service = AuthService(db)
-    await service.logout_all(current_user)
-    service.clear_auth_cookies(response)
-    return MessageResponse(message="Logged out of all devices")
+    try:
+        service = AuthService(db)
+        await service.logout_all(current_user)
+        clear_auth_cookies(response)
+        return MessageResponse(message="Logged out of all devices")
+    except (AppException, SQLAlchemyError):
+        raise
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred",
+        ) from exc

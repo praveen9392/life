@@ -119,6 +119,30 @@ async def test_logout_revokes_session(api_client: AsyncClient) -> None:
     assert "access_token" not in api_client.cookies
 
 
+async def test_logout_all_revokes_every_session(api_client: AsyncClient) -> None:
+    await api_client.post(
+        "/api/v1/auth/register",
+        json={"email": "logout-all@example.com", "password": "correct-horse-battery"},
+    )
+    old_refresh = api_client.cookies.get("refresh_token")
+    assert old_refresh is not None
+
+    response = await api_client.post("/api/v1/auth/logout-all", headers=csrf_headers(api_client))
+    assert response.status_code == 200
+    assert "refresh_token" not in api_client.cookies
+    assert "access_token" not in api_client.cookies
+
+    # Re-present the pre-logout refresh token (as a stale second device would):
+    # revoked server-side, so refresh must 401. A CSRF cookie+header pair is
+    # set so the request exercises the service layer (not the CSRF guard).
+    api_client.cookies.set("refresh_token", old_refresh)
+    api_client.cookies.set("csrf_token", "stale-csrf-token")
+    refresh = await api_client.post(
+        "/api/v1/auth/refresh", headers={"X-CSRF-Token": "stale-csrf-token"}
+    )
+    assert refresh.status_code == 401
+
+
 async def test_me_requires_authentication(api_client: AsyncClient) -> None:
     response = await api_client.get("/api/v1/users/me")
     assert response.status_code == 401
@@ -159,6 +183,43 @@ async def test_mutating_request_with_correct_csrf_header_succeeds(api_client: As
     )
     assert response.status_code == 200
     assert response.json()["full_name"] == "Renamed"
+
+
+async def test_refresh_without_csrf_header_is_rejected_when_access_cookie_absent(
+    api_client: AsyncClient,
+) -> None:
+    """The refresh cookie is itself a session credential: a CSRF must not be
+    able to turn it into a fresh access token just because the short-lived
+    access cookie already expired."""
+    await api_client.post(
+        "/api/v1/auth/register",
+        json={"email": "csrf-refresh@example.com", "password": "correct-horse-battery"},
+    )
+    api_client.cookies.delete("access_token")
+    assert "access_token" not in api_client.cookies
+    assert api_client.cookies.get("refresh_token") is not None
+
+    response = await api_client.post("/api/v1/auth/refresh")  # no X-CSRF-Token
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "CSRF_VALIDATION_FAILED"
+
+
+async def test_refresh_with_csrf_header_succeeds_when_access_cookie_absent(
+    api_client: AsyncClient,
+) -> None:
+    """Same shape as the real frontend's expired-access-token refresh: refresh
+    + csrf cookies present, X-CSRF-Token header matching the csrf cookie."""
+    await api_client.post(
+        "/api/v1/auth/register",
+        json={"email": "csrf-refresh-ok@example.com", "password": "correct-horse-battery"},
+    )
+    api_client.cookies.delete("access_token")
+    assert "access_token" not in api_client.cookies
+
+    response = await api_client.post("/api/v1/auth/refresh", headers=csrf_headers(api_client))
+    assert response.status_code == 200
+    # A fresh access cookie was issued.
+    assert api_client.cookies.get("access_token") is not None
 
 
 async def test_password_change_revokes_sessions(api_client: AsyncClient) -> None:

@@ -2,13 +2,15 @@
 
 import uuid
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.api.deps import CurrentUser, DbSession, get_pagination
+from app.core.exceptions import AppException
 from app.repositories.note_repository import NoteSortField, SortOrder
 from app.schemas.note import NoteCreateRequest, NoteResponse, NoteUpdateRequest
 from app.services.note_service import NoteService
-from app.utils.pagination import Page, PaginationParams
+from app.utils.pagination import Page, PaginationParams, build_page
 
 router = APIRouter(prefix="/notes", tags=["notes"])
 
@@ -22,23 +24,32 @@ async def list_notes(
         default=None, description="Defaults to the fixed pinned-first/updated-at ordering when omitted."
     ),
     order: SortOrder = Query(default="desc"),
+    directory_id: uuid.UUID | None = Query(default=None),
+    unfiled: bool = Query(default=False),
     pagination: PaginationParams = Depends(get_pagination),
 ) -> Page[NoteResponse]:
-    service = NoteService(db)
-    items, total = await service.list_notes(
-        current_user.id,
-        search=search,
-        offset=pagination.offset,
-        limit=pagination.page_size,
-        sort=sort,
-        order=order,
-    )
-    return Page(
-        items=[NoteResponse.model_validate(note) for note in items],
-        total=total,
-        page=pagination.page,
-        page_size=pagination.page_size,
-    )
+    try:
+        service = NoteService(db)
+        items, total = await service.list_notes(
+            current_user.id,
+            search=search,
+            offset=pagination.offset,
+            limit=pagination.page_size,
+            sort=sort,
+            order=order,
+            directory_id=directory_id,
+            unfiled_only=unfiled,
+        )
+        return build_page(
+            [NoteResponse.model_validate(note) for note in items], total, pagination
+        )
+    except (AppException, SQLAlchemyError):
+        raise
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred",
+        ) from exc
 
 
 @router.post("", response_model=NoteResponse, status_code=201)
@@ -47,9 +58,17 @@ async def create_note(
     current_user: CurrentUser,
     db: DbSession,
 ) -> NoteResponse:
-    service = NoteService(db)
-    note = await service.create_note(current_user.id, payload)
-    return NoteResponse.model_validate(note)
+    try:
+        service = NoteService(db)
+        note = await service.create_note(current_user.id, payload)
+        return NoteResponse.model_validate(note)
+    except (AppException, SQLAlchemyError):
+        raise
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred",
+        ) from exc
 
 
 @router.get("/{note_id}", response_model=NoteResponse)
@@ -58,9 +77,17 @@ async def get_note(
     current_user: CurrentUser,
     db: DbSession,
 ) -> NoteResponse:
-    service = NoteService(db)
-    note = await service.get_note(current_user.id, note_id)
-    return NoteResponse.model_validate(note)
+    try:
+        service = NoteService(db)
+        note = await service.get_note(current_user.id, note_id)
+        return NoteResponse.model_validate(note)
+    except (AppException, SQLAlchemyError):
+        raise
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred",
+        ) from exc
 
 
 @router.patch("/{note_id}", response_model=NoteResponse)
@@ -70,9 +97,17 @@ async def update_note(
     current_user: CurrentUser,
     db: DbSession,
 ) -> NoteResponse:
-    service = NoteService(db)
-    note = await service.update_note(current_user.id, note_id, payload)
-    return NoteResponse.model_validate(note)
+    try:
+        service = NoteService(db)
+        note = await service.update_note(current_user.id, note_id, payload)
+        return NoteResponse.model_validate(note)
+    except (AppException, SQLAlchemyError):
+        raise
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred",
+        ) from exc
 
 
 @router.delete("/{note_id}", status_code=204)
@@ -81,5 +116,13 @@ async def delete_note(
     current_user: CurrentUser,
     db: DbSession,
 ) -> None:
-    service = NoteService(db)
-    await service.delete_note(current_user.id, note_id)
+    try:
+        service = NoteService(db)
+        await service.delete_note(current_user.id, note_id)
+    except (AppException, SQLAlchemyError):
+        raise
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred",
+        ) from exc

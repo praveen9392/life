@@ -5,7 +5,6 @@ import {
   type WorkoutSessionCreateInput,
 } from "./api";
 
-export const WORKOUTS_QUERY_KEY = ["workouts"] as const;
 export const EXERCISES_QUERY_KEY = ["exercises"] as const;
 export const SESSIONS_QUERY_KEY = ["workout-sessions"] as const;
 
@@ -14,14 +13,6 @@ export function useExercises(search?: string) {
     queryKey: [...EXERCISES_QUERY_KEY, search ?? ""],
     queryFn: ({ signal }) => workoutsApi.listExercises(search, signal),
     staleTime: 5 * 60 * 1000,
-  });
-}
-
-export function useWorkouts() {
-  return useQuery({
-    queryKey: WORKOUTS_QUERY_KEY,
-    queryFn: ({ signal }) => workoutsApi.listWorkouts(signal),
-    staleTime: 30 * 1000,
   });
 }
 
@@ -37,9 +28,10 @@ function useInvalidateWorkouts() {
   const queryClient = useQueryClient();
   return () => {
     void queryClient.invalidateQueries({ queryKey: SESSIONS_QUERY_KEY });
-    void queryClient.invalidateQueries({ queryKey: WORKOUTS_QUERY_KEY });
     void queryClient.invalidateQueries({ queryKey: EXERCISES_QUERY_KEY });
     void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+    void queryClient.invalidateQueries({ queryKey: ["calendar"] });
+    void queryClient.invalidateQueries({ queryKey: ["analytics"] });
   };
 }
 
@@ -48,15 +40,6 @@ export function useCreateExercise() {
   return useMutation({
     mutationFn: (input: { name: string; muscle_group?: string; equipment?: string }) =>
       workoutsApi.createExercise(input),
-    onSuccess: invalidate,
-  });
-}
-
-export function useCreateWorkout() {
-  const invalidate = useInvalidateWorkouts();
-  return useMutation({
-    mutationFn: (input: { name: string; description?: string }) =>
-      workoutsApi.createWorkout(input),
     onSuccess: invalidate,
   });
 }

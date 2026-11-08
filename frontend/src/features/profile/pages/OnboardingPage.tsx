@@ -6,17 +6,7 @@ import { Input } from "../../../components/ui/Input";
 import { useCurrentUser } from "../../auth/hooks";
 import { useCompleteOnboarding, useUpdateProfile } from "../hooks";
 import type { NotificationPreferences, ThemePreference } from "../../../types/user";
-
-const TIMEZONES = [
-  "UTC",
-  "Asia/Kolkata",
-  "Europe/London",
-  "Europe/Berlin",
-  "America/New_York",
-  "America/Los_Angeles",
-  "Asia/Tokyo",
-  "Australia/Sydney",
-];
+import { TIMEZONES } from "../../../utils/timezones";
 
 function guessTimezone(): string {
   try {
@@ -49,20 +39,30 @@ export default function OnboardingPage() {
   );
 
   async function saveAndFinish() {
-    await updateProfile.mutateAsync({
-      full_name: name || null,
-      timezone,
-      theme_preference: theme,
-      notification_preferences: notifications,
-    });
-    await completeOnboarding.mutateAsync();
-    void navigate("/app", { replace: true });
+    try {
+      await updateProfile.mutateAsync({
+        full_name: name || null,
+        timezone,
+        theme_preference: theme,
+        notification_preferences: notifications,
+      });
+      await completeOnboarding.mutateAsync();
+      void navigate("/app", { replace: true });
+    } catch {
+      // Failure is surfaced via the mutations' isError state below.
+    }
   }
 
   async function skipAll() {
-    await completeOnboarding.mutateAsync();
-    void navigate("/app", { replace: true });
+    try {
+      await completeOnboarding.mutateAsync();
+      void navigate("/app", { replace: true });
+    } catch {
+      // Failure is surfaced via the mutation's isError state below.
+    }
   }
+
+  const saveFailed = updateProfile.isError || completeOnboarding.isError;
 
   const steps = [
     // Step 1: name + timezone
@@ -143,8 +143,26 @@ export default function OnboardingPage() {
           <p className="mt-1 text-sm text-text-muted">
             Step {step + 1} of {steps.length} - everything is optional and skippable.
           </p>
+          <div
+            className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-surface-hover"
+            role="progressbar"
+            aria-valuenow={step + 1}
+            aria-valuemin={1}
+            aria-valuemax={steps.length}
+            aria-label="Onboarding progress"
+          >
+            <div
+              className="h-full rounded-full bg-accent transition-all"
+              style={{ width: `${((step + 1) / steps.length) * 100}%` }}
+            />
+          </div>
         </div>
         <div className="card space-y-6">{steps[step]}</div>
+        {saveFailed ? (
+          <p role="alert" className="mt-3 text-center text-sm text-danger">
+            Couldn't save your setup. Check your connection and try again.
+          </p>
+        ) : null}
         <div className="mt-4 flex items-center justify-between">
           <button
             type="button"

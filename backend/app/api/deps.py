@@ -9,11 +9,12 @@ Authorization"). Client-supplied `user_id` values are never trusted.
 from collections.abc import AsyncGenerator
 from typing import Annotated
 
-from fastapi import Depends, Request
+from fastapi import Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.exceptions import UnauthorizedError
+from app.core.logging import logger
 from app.core.security import decode_access_token
 from app.db.session import get_session
 from app.models.user import User
@@ -26,7 +27,9 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
         yield session
 
 
-def get_pagination(page: int = 1, page_size: int = 20) -> PaginationParams:
+def get_pagination(
+    page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100)
+) -> PaginationParams:
     return PaginationParams(page=page, page_size=page_size)
 
 
@@ -42,19 +45,16 @@ async def get_current_user(
     settings = get_settings()
     token = request.cookies.get(settings.access_cookie_name)
     if token is None:
+        logger.warning("Missing access token")
         raise UnauthorizedError("Authentication required")
 
     user_id = decode_access_token(token)
-    user = await UserRepository(db).get_by_id(user_id)
+    user = await UserRepository(db).get_by_id_query(user_id)
     if user is None or not user.is_active:
+        logger.warning("Unknown or inactive user")
         raise UnauthorizedError("Authentication required")
+    logger.debug(f"Authenticated user: {user.id}")
     return user
-
-
-def get_refresh_token_from_cookie(request: Request) -> str | None:
-    """The raw refresh token, read from its httpOnly cookie (may be absent)."""
-    settings = get_settings()
-    return request.cookies.get(settings.refresh_cookie_name)
 
 
 CurrentUser = Annotated[User, Depends(get_current_user)]

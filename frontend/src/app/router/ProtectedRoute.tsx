@@ -1,12 +1,15 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 
-import { useCurrentUser } from "../../features/auth/hooks";
+import { useCurrentUser, useSyncThemeFromProfile } from "../../features/auth/hooks";
 
 /** Route guard: unauthenticated visitors are redirected to /login, keeping
  * the page they tried to reach so they land back on it after logging in. */
 export function ProtectedRoute() {
   const { data, isPending, isError } = useCurrentUser();
   const location = useLocation();
+
+  // Hydrates uiStore.theme from the server's theme_preference on sign-in.
+  useSyncThemeFromProfile();
 
   if (isPending) {
     return (

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
@@ -6,6 +6,7 @@ import { EmptyState } from "../../../components/common/EmptyState";
 import { QueryStateBoundary } from "../../../components/common/QueryStateBoundary";
 import { Skeleton } from "../../../components/ui/Skeleton";
 import { cn } from "../../../utils/cn";
+import { toISODate } from "../../../utils/date";
 import type { CalendarDayEntry } from "../../analytics/api";
 import { useCalendarRange } from "../../analytics/hooks";
 
@@ -15,28 +16,28 @@ const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const VIEW_MODES: ViewMode[] = ["month", "week", "day"];
 
 function toIso(date: Date): string {
-  return date.toISOString().slice(0, 10);
+  return toISODate(date);
 }
 
 function monthGridRange(year: number, month: number): { start: string; end: string } {
-  const first = new Date(Date.UTC(year, month, 1));
-  const last = new Date(Date.UTC(year, month + 1, 0));
+  const first = new Date(year, month, 1);
+  const last = new Date(year, month + 1, 0);
   // Week starts Monday.
-  const startOffset = (first.getUTCDay() + 6) % 7;
-  const endOffset = 6 - ((last.getUTCDay() + 6) % 7);
+  const startOffset = (first.getDay() + 6) % 7;
+  const endOffset = 6 - ((last.getDay() + 6) % 7);
   const start = new Date(first);
-  start.setUTCDate(first.getUTCDate() - startOffset);
+  start.setDate(first.getDate() - startOffset);
   const end = new Date(last);
-  end.setUTCDate(last.getUTCDate() + endOffset);
+  end.setDate(last.getDate() + endOffset);
   return { start: toIso(start), end: toIso(end) };
 }
 
 function weekRange(selected: Date): { start: string; end: string } {
   const monday = new Date(selected);
-  const offset = (selected.getUTCDay() + 6) % 7;
-  monday.setUTCDate(selected.getUTCDate() - offset);
+  const offset = (selected.getDay() + 6) % 7;
+  monday.setDate(selected.getDate() - offset);
   const sunday = new Date(monday);
-  sunday.setUTCDate(monday.getUTCDate() + 6);
+  sunday.setDate(monday.getDate() + 6);
   return { start: toIso(monday), end: toIso(sunday) };
 }
 
@@ -93,15 +94,66 @@ function DayCell({ entry, inMonth, isToday }: { entry: CalendarDayEntry | null; 
   );
 }
 
+function CompactDayCell({
+  date,
+  entry,
+  inMonth,
+  isToday,
+  isActive,
+  onSelect,
+}: {
+  date: string;
+  entry: CalendarDayEntry | null;
+  inMonth: boolean;
+  isToday: boolean;
+  isActive: boolean;
+  onSelect: (date: string) => void;
+}) {
+  const dots = [
+    entry && entry.tasks_due > 0 ? "bg-accent" : null,
+    entry && entry.habits_due > 0 ? "bg-success" : null,
+    entry && entry.workout_sessions > 0 ? "bg-warning" : null,
+    entry && entry.learning_minutes > 0 ? "bg-text-muted" : null,
+    entry && entry.milestones_due > 0 ? "bg-danger" : null,
+  ].filter((color): color is string => color !== null);
+
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(date)}
+      aria-pressed={isActive}
+      aria-label={new Date(`${date}T00:00:00`).toLocaleDateString(undefined, {
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+      })}
+      className={cn(
+        "flex h-11 min-w-0 flex-col items-center justify-center gap-1 rounded-lg border border-border md:hidden",
+        inMonth ? "bg-surface" : "bg-surface/40 opacity-50",
+        isToday && "border-accent",
+        isActive && "ring-2 ring-accent/60",
+      )}
+    >
+      <span className={cn("text-xs font-medium", isToday ? "text-accent" : inMonth ? "text-text" : "text-text-muted")}>
+        {Number(date.slice(8, 10))}
+      </span>
+      <span className="flex h-1.5 items-center gap-0.5" aria-hidden>
+        {dots.map((color) => (
+          <span key={color} className={cn("h-1.5 w-1.5 rounded-full", color)} />
+        ))}
+      </span>
+    </button>
+  );
+}
+
 /** Larger-format day summary card, reused by both the week and day views -
  * same aggregation fields as the month grid, just given more room to
  * breathe since there are only 1-7 cells to show instead of ~35. */
 function DaySummaryCard({ entry, date, isToday }: { entry: CalendarDayEntry | null; date: string; isToday: boolean }) {
-  const label = new Date(`${date}T00:00:00Z`).toLocaleDateString(undefined, {
+  const label = new Date(`${date}T00:00:00`).toLocaleDateString(undefined, {
     weekday: "short",
     month: "short",
     day: "numeric",
-    timeZone: "UTC",
   });
   return (
     <motion.div
@@ -138,9 +190,10 @@ function DaySummaryCard({ entry, date, isToday }: { entry: CalendarDayEntry | nu
 export default function CalendarPage() {
   const [viewMode, setViewMode] = useState<ViewMode>("month");
   const [selected, setSelected] = useState(() => new Date());
+  const [activeDate, setActiveDate] = useState(() => toIso(new Date()));
 
-  const year = selected.getUTCFullYear();
-  const month = selected.getUTCMonth();
+  const year = selected.getFullYear();
+  const month = selected.getMonth();
 
   const range = useMemo(() => {
     if (viewMode === "month") return monthGridRange(year, month);
@@ -163,44 +216,43 @@ export default function CalendarPage() {
 
   const shift = (delta: number) => {
     const next = new Date(selected);
-    if (viewMode === "month") next.setUTCMonth(next.getUTCMonth() + delta);
-    else if (viewMode === "week") next.setUTCDate(next.getUTCDate() + delta * 7);
-    else next.setUTCDate(next.getUTCDate() + delta);
+    if (viewMode === "month") next.setMonth(next.getMonth() + delta);
+    else if (viewMode === "week") next.setDate(next.getDate() + delta * 7);
+    else next.setDate(next.getDate() + delta);
     setSelected(next);
   };
 
   const headerLabel =
     viewMode === "month"
-      ? `${new Date(Date.UTC(year, month, 1)).toLocaleString(undefined, { month: "long", timeZone: "UTC" })} ${year}`
+      ? `${new Date(year, month, 1).toLocaleString(undefined, { month: "long" })} ${year}`
       : viewMode === "week"
         ? `${range.start} – ${range.end}`
-        : new Date(`${range.start}T00:00:00Z`).toLocaleDateString(undefined, {
+        : new Date(`${range.start}T00:00:00`).toLocaleDateString(undefined, {
             weekday: "long",
             month: "long",
             day: "numeric",
             year: "numeric",
-            timeZone: "UTC",
           });
 
   // Build month-grid cells (only used in month view).
   const monthCells: Array<{ date: string; inMonth: boolean }> = [];
   if (viewMode === "month") {
-    const cursor = new Date(`${range.start}T00:00:00Z`);
-    const endCursor = new Date(`${range.end}T00:00:00Z`);
+    const cursor = new Date(`${range.start}T00:00:00`);
+    const endCursor = new Date(`${range.end}T00:00:00`);
     while (cursor <= endCursor) {
       const iso = toIso(cursor);
-      monthCells.push({ date: iso, inMonth: cursor.getUTCMonth() === month });
-      cursor.setUTCDate(cursor.getUTCDate() + 1);
+      monthCells.push({ date: iso, inMonth: cursor.getMonth() === month });
+      cursor.setDate(cursor.getDate() + 1);
     }
   }
 
   // Build week-view cells (7 days, Monday-anchored).
   const weekCells: string[] = [];
   if (viewMode === "week") {
-    const cursor = new Date(`${range.start}T00:00:00Z`);
+    const cursor = new Date(`${range.start}T00:00:00`);
     for (let i = 0; i < 7; i += 1) {
       weekCells.push(toIso(cursor));
-      cursor.setUTCDate(cursor.getUTCDate() + 1);
+      cursor.setDate(cursor.getDate() + 1);
     }
   }
 
@@ -208,13 +260,12 @@ export default function CalendarPage() {
     <div className="space-y-4">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold text-text">Calendar</h1>
-        <div role="tablist" aria-label="Calendar view" className="flex gap-1">
+        <div role="group" aria-label="Calendar view" className="flex gap-1">
           {VIEW_MODES.map((mode) => (
             <button
               key={mode}
               type="button"
-              role="tab"
-              aria-selected={viewMode === mode}
+              aria-pressed={viewMode === mode}
               onClick={() => setViewMode(mode)}
               className={cn(
                 "rounded-lg px-3 py-1.5 text-sm font-medium capitalize transition-colors",
@@ -250,7 +301,7 @@ export default function CalendarPage() {
       </div>
 
       {viewMode === "month" ? (
-        <div className="grid grid-cols-7 gap-1" role="row">
+        <div className="grid grid-cols-7 gap-1">
           {WEEKDAY_LABELS.map((label) => (
             <div key={label} className="pb-1 text-center text-xs font-medium text-text-muted">
               {label}
@@ -266,15 +317,35 @@ export default function CalendarPage() {
       >
         {() =>
           viewMode === "month" ? (
-            <div className="grid grid-cols-7 gap-1" role="grid" aria-label={`Calendar for ${year}-${month + 1}`}>
+            <div className="space-y-3">
+            <div className="grid grid-cols-7 gap-1" aria-label={`Calendar for ${year}-${month + 1}`}>
               {monthCells.map((cell) => (
-                <DayCell
-                  key={cell.date}
-                  entry={daysByDate.get(cell.date) ?? null}
-                  inMonth={cell.inMonth}
-                  isToday={cell.date === todayIso}
-                />
+                <Fragment key={cell.date}>
+                  <CompactDayCell
+                    date={cell.date}
+                    entry={daysByDate.get(cell.date) ?? null}
+                    inMonth={cell.inMonth}
+                    isToday={cell.date === todayIso}
+                    isActive={cell.date === activeDate}
+                    onSelect={setActiveDate}
+                  />
+                  <div className="hidden md:block">
+                    <DayCell
+                      entry={daysByDate.get(cell.date) ?? null}
+                      inMonth={cell.inMonth}
+                      isToday={cell.date === todayIso}
+                    />
+                  </div>
+                </Fragment>
               ))}
+            </div>
+            <div className="md:hidden" aria-label="Selected day details" aria-live="polite">
+              <DaySummaryCard
+                date={activeDate}
+                entry={daysByDate.get(activeDate) ?? null}
+                isToday={activeDate === todayIso}
+              />
+            </div>
             </div>
           ) : viewMode === "week" ? (
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7" aria-label="Week view">

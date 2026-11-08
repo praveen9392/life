@@ -5,7 +5,7 @@
 ```
 routes (app/api/v1/routes/)   -> HTTP only: parse, call service, serialize
 services (app/services/)      -> business logic, derived state, policy
-repositories (app/repos/)     -> data access; EVERY query ownership-scoped
+repositories (app/repositories/) -> data access; EVERY query ownership-scoped
 models (app/models/)          -> tables, FKs, check constraints, indexes
 schemas (app/schemas/)        -> request/response contracts
 ```
@@ -81,12 +81,12 @@ what the user sets. Status auto-syncs: >0% → in_progress, 100% → completed.
 { "error": { "code": "ERROR_CODE", "message": "..." , "fields": {...}? } }
 ```
 
-- 400 `VALIDATION_ERROR` (with per-field messages)
+- 422 `VALIDATION_ERROR` (with per-field messages)
 - 401 `UNAUTHORIZED` / `TOKEN_EXPIRED`
 - 403 `CSRF_VALIDATION_FAILED` (browser-session mutations only)
 - 404 `NOT_FOUND` (also for foreign-owned resources)
 - 409 `CONFLICT` (e.g. duplicate email)
-- 429 `RATE_LIMIT_EXCEEDED` (slowapi; auth endpoints 5–10/min)
+- 429 `RATE_LIMITED` (slowapi; auth endpoints 5–10/min)
 - 500 `INTERNAL_ERROR` — request ID logged, stack never exposed
 
 ## Notifications
@@ -98,7 +98,7 @@ is already correct.
 
 ## Observability
 
-- Structlog JSON logs; `X-Request-ID` correlated through every request.
+- Stdlib `logging` (stdout; JSON in production; optional rotating `LOG_FILE`); `X-Request-ID` is validated and injected into every log line. See `docs/architecture/logging-and-observability.md`.
 - Slowapi rate limiting with a Redis upgrade path (`RATE_LIMIT_STORAGE_URI`).
 - Security headers on every response (nosniff, DENY framing, HSTS in prod).
 - `/health` liveness endpoint (no auth, no DB access) and `/health/db`

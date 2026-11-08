@@ -1,0 +1,87 @@
+{
+  "results": [
+    {
+      "name": "load login (guest)",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "name": "login validation (empty)",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "name": "login wrong password",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "name": "login success -> Today",
+      "ok": true,
+      "note": "Good morning, Ava"
+    },
+    {
+      "name": "route /app/tasks",
+      "ok": true,
+      "note": "Tasks"
+    },
+    {
+      "name": "route /app/habits",
+      "ok": true,
+      "note": "Habits"
+    },
+    {
+      "name": "route /app/notes",
+      "ok": true,
+      "note": "Notes"
+    },
+    {
+      "name": "route /app/health",
+      "ok": true,
+      "note": "Health"
+    },
+    {
+      "name": "route /app/workouts",
+      "ok": true,
+      "note": "Workouts"
+    },
+    {
+      "name": "route /app/learning",
+      "ok": true,
+      "note": "Learning"
+    },
+    {
+      "name": "route /app/goals",
+      "ok": true,
+      "note": "Goals"
+    },
+    {
+      "name": "route /app/calendar",
+      "ok": true,
+      "note": "Calendar"
+    },
+    {
+      "name": "route /app/insights",
+      "ok": true,
+      "note": "Insights"
+    },
+    {
+      "name": "route /app/settings",
+      "ok": false,
+      "note": "locator.click: Timeout 8000ms exceeded."
+    },
+    {
+      "name": "404",
+      "ok": true,
+      "note": ""
+    }
+  ],
+  "errors": [
+    "/login?api=http%3A%2F%2Flocalhost%3A8002 :: Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+  ],
+  "failed": [
+    "401 GET /api/v1/users/me",
+    "401 POST /api/v1/auth/refresh",
+    "401 POST /api/v1/auth/login"
+  ]
+}

@@ -1,421 +1,311 @@
-import { useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { CalendarDays, CheckCircle2, Flame, Pencil, Plus, Trash2 } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
+import { ChevronLeft, ChevronRight, LayoutGrid, Plus, Search } from "lucide-react";
 
 import { EmptyState } from "../../../components/common/EmptyState";
-import { QueryStateBoundary } from "../../../components/common/QueryStateBoundary";
+import { ErrorState } from "../../../components/common/ErrorState";
 import { Button } from "../../../components/ui/Button";
-import { Input } from "../../../components/ui/Input";
-import { Modal } from "../../../components/ui/Modal";
+import { ConfirmDialog } from "../../../components/ui/ConfirmDialog";
 import { Skeleton } from "../../../components/ui/Skeleton";
+import { useUIStore } from "../../../stores/uiStore";
 import { cn } from "../../../utils/cn";
-import type { Habit, HabitFrequencyType, HabitLogStatus } from "../api";
-import {
-  useCreateHabit,
-  useDeleteHabit,
-  useHabitHistory,
-  useHabitStreak,
-  useLogHabit,
-  useUpdateHabit,
-  useHabits,
-} from "../hooks";
+import type { Habit } from "../api";
+import { CreateHabitModal, EditHabitModal } from "../components/HabitModals";
+import { HeatmapView } from "../components/HabitHeatmap";
+import { MobileHabitList } from "../components/MobileHabitList";
+import { SummaryStatCards, WeeklyConsistencyBadge } from "../components/StatCards";
+import { WeeklyGrid } from "../components/WeeklyGrid";
+import { MAX_WEEK_OFFSET, MIN_WEEK_OFFSET, filterHabits } from "../habitUtils";
+import { useDeleteHabit, useHabits } from "../hooks";
 
-function todayString(): string {
-  return new Date().toISOString().slice(0, 10);
+type ViewMode = "weekly" | "heatmap";
+
+const PARAM_QUERY = "q";
+const PARAM_PILLAR = "pillar";
+const PARAM_WEEK = "week";
+const DEFAULT_PILLAR = "all";
+
+function parseWeekOffset(raw: string | null): number {
+  const parsed = Number.parseInt(raw ?? "", 10);
+  if (Number.isNaN(parsed)) return 0;
+  return Math.min(Math.max(parsed, MIN_WEEK_OFFSET), MAX_WEEK_OFFSET);
 }
 
-const HEATMAP_DAYS = 84;
-
-const STATUS_STYLES: Record<HabitLogStatus, string> = {
-  completed: "bg-accent",
-  skipped: "bg-warning/50",
-  missed: "bg-danger/60",
-  not_applicable: "bg-surface-hover",
-};
-
-/**
- * Simple CSS-grid completion heatmap for the last ~12 weeks.
- *
- * Known limitation: the backend's `/habits/{id}/history` endpoint only
- * returns rows for days that actually have a log entry (see
- * `backend/app/api/v1/routes/habits.py::habit_history`) - there is no
- * server-side backfill of implicit "missed" days that were simply never
- * logged. Days with no log row are rendered as a neutral/empty cell rather
- * than a false "missed" to avoid fabricating data the API doesn't provide.
- */
-function HabitHeatmap({ habitId }: { habitId: string }) {
-  const historyQuery = useHabitHistory(habitId, HEATMAP_DAYS);
-
-  if (historyQuery.isPending) {
-    return <Skeleton className="h-20 w-full" />;
-  }
-
-  const logByDate = new Map((historyQuery.data ?? []).map((log) => [log.log_date, log]));
-  const days: { date: string; status: HabitLogStatus | null }[] = [];
-  const cursor = new Date();
-  cursor.setDate(cursor.getDate() - (HEATMAP_DAYS - 1));
-  for (let i = 0; i < HEATMAP_DAYS; i += 1) {
-    const iso = cursor.toISOString().slice(0, 10);
-    const log = logByDate.get(iso);
-    days.push({ date: iso, status: log?.status ?? null });
-    cursor.setDate(cursor.getDate() + 1);
-  }
-
+function ViewTab({
+  active,
+  onClick,
+  icon,
+  label,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+  label: string;
+}) {
   return (
-    <div>
-      <div
-        className="grid gap-1"
-        style={{ gridTemplateColumns: "repeat(auto-fill, minmax(10px, 1fr))" }}
-        role="img"
-        aria-label={`Completion history for the last ${HEATMAP_DAYS} days`}
-      >
-        {days.map((day) => (
-          <div
-            key={day.date}
-            title={`${day.date}${day.status ? `: ${day.status.replace("_", " ")}` : ": no entry"}`}
-            className={cn(
-              "h-2.5 w-full rounded-sm",
-              day.status ? STATUS_STYLES[day.status] : "bg-surface-hover/50",
-            )}
-          />
-        ))}
-      </div>
-      <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-text-muted">
-        <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-sm bg-accent" /> Completed</span>
-        <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-sm bg-warning/50" /> Skipped</span>
-        <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-sm bg-danger/60" /> Missed</span>
-        <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-sm bg-surface-hover/50" /> No entry</span>
-      </div>
-    </div>
-  );
-}
-
-interface HabitDraft {
-  name: string;
-  description: string;
-  category: string;
-  frequency_type: HabitFrequencyType;
-  target_count: string;
-}
-
-function draftFromHabit(habit: Habit): HabitDraft {
-  return {
-    name: habit.name,
-    description: habit.description ?? "",
-    category: habit.category ?? "",
-    frequency_type: habit.frequency_type,
-    target_count: String(habit.target_count),
-  };
-}
-
-function EditHabitModal({ habit, onClose }: { habit: Habit; onClose: () => void }) {
-  const updateHabit = useUpdateHabit();
-  const [draft, setDraft] = useState<HabitDraft>(() => draftFromHabit(habit));
-
-  const submit = (event: FormEvent) => {
-    event.preventDefault();
-    const name = draft.name.trim();
-    if (!name || updateHabit.isPending) return;
-    updateHabit.mutate(
-      {
-        habitId: habit.id,
-        input: {
-          name,
-          description: draft.description || null,
-          category: draft.category || null,
-          frequency_type: draft.frequency_type,
-          target_count: Number(draft.target_count) || 1,
-        },
-      },
-      { onSuccess: onClose },
-    );
-  };
-
-  return (
-    <Modal open onOpenChange={(open) => !open && onClose()} title="Edit habit">
-      <form onSubmit={submit} className="space-y-4">
-        <Input
-          label="Name"
-          value={draft.name}
-          onChange={(event) => setDraft({ ...draft, name: event.target.value })}
-          maxLength={200}
-          required
-          autoFocus
-        />
-        <Input
-          label="Category (optional)"
-          value={draft.category}
-          onChange={(event) => setDraft({ ...draft, category: event.target.value })}
-          maxLength={100}
-        />
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label htmlFor="edit-habit-frequency" className="label">Frequency</label>
-            <select
-              id="edit-habit-frequency"
-              className="input"
-              value={draft.frequency_type}
-              onChange={(event) => setDraft({ ...draft, frequency_type: event.target.value as HabitFrequencyType })}
-            >
-              <option value="daily">Daily</option>
-              <option value="weekly">Weekly</option>
-            </select>
-          </div>
-          <Input
-            label="Target count"
-            type="number"
-            min="1"
-            value={draft.target_count}
-            onChange={(event) => setDraft({ ...draft, target_count: event.target.value })}
-          />
-        </div>
-        {updateHabit.isError ? (
-          <p role="alert" className="text-sm text-danger">{updateHabit.error.message}</p>
-        ) : null}
-        <div className="flex justify-end gap-2">
-          <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button type="submit" isLoading={updateHabit.isPending} disabled={!draft.name.trim()}>
-            Save changes
-          </Button>
-        </div>
-      </form>
-    </Modal>
-  );
-}
-
-function HabitCard({ habit, onEdit }: { habit: Habit; onEdit: () => void }) {
-  const logHabit = useLogHabit();
-  const deleteHabit = useDeleteHabit();
-  const { data: streak } = useHabitStreak(habit.id);
-  const [showHistory, setShowHistory] = useState(false);
-  const [justCompleted, setJustCompleted] = useState(false);
-  const today = todayString();
-
-  const logCompleted = () => {
-    logHabit.mutate(
-      { habitId: habit.id, logDate: today, status: "completed" },
-      {
-        onSuccess: () => {
-          setJustCompleted(true);
-          setTimeout(() => setJustCompleted(false), 900);
-        },
-      },
-    );
-  };
-
-  return (
-    <motion.li
-      layout
-      whileHover={{ y: -2 }}
-      className="relative rounded-card border border-border bg-surface p-4 transition-shadow hover:shadow-md"
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={cn(
+        "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors",
+        active
+          ? "bg-accent text-accent-contrast"
+          : "text-text-muted hover:bg-surface-hover hover:text-text",
+      )}
     >
-      {/* Spring/scale completion burst, matching the Dashboard check-icon
-          swap pattern but with an added celebratory pop. */}
-      <AnimatePresence>
-        {justCompleted ? (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.4 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 1.2 }}
-            transition={{ type: "spring", stiffness: 400, damping: 20 }}
-            className="pointer-events-none absolute right-3 top-3 text-accent"
-            aria-hidden
-          >
-            <CheckCircle2 className="h-6 w-6" />
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="truncate font-medium text-text">{habit.name}</p>
-          <p className="mt-0.5 text-xs text-text-muted">
-            {habit.frequency_type.replace("_", " ")}
-            {habit.category ? ` · ${habit.category}` : ""}
-          </p>
-        </div>
-        {streak && streak.current_streak > 0 ? (
-          <span
-            className="inline-flex items-center gap-1 rounded-full bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning"
-            aria-label={`Current streak: ${streak.current_streak} days`}
-          >
-            <Flame className="h-3.5 w-3.5" aria-hidden />
-            {streak.current_streak}
-          </span>
-        ) : null}
-      </div>
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <motion.div whileTap={{ scale: 0.92 }}>
-          <Button size="sm" onClick={logCompleted} isLoading={logHabit.isPending}>
-            Done today
-          </Button>
-        </motion.div>
-        <motion.div whileTap={{ scale: 0.92 }}>
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={() => logHabit.mutate({ habitId: habit.id, logDate: today, status: "skipped" })}
-            disabled={logHabit.isPending}
-          >
-            Skip
-          </Button>
-        </motion.div>
-        <button
-          type="button"
-          onClick={() => setShowHistory((value) => !value)}
-          aria-expanded={showHistory}
-          aria-label="Toggle completion history"
-          className="rounded-lg p-1.5 text-text-muted hover:bg-surface-hover hover:text-accent"
-        >
-          <CalendarDays className="h-4 w-4" aria-hidden />
-        </button>
-        <button
-          type="button"
-          onClick={onEdit}
-          aria-label={`Edit habit "${habit.name}"`}
-          className="rounded-lg p-1.5 text-text-muted hover:bg-surface-hover hover:text-accent"
-        >
-          <Pencil className="h-4 w-4" aria-hidden />
-        </button>
-        <button
-          type="button"
-          onClick={() => deleteHabit.mutate(habit.id)}
-          disabled={deleteHabit.isPending}
-          aria-label={`Delete habit "${habit.name}"`}
-          className="ml-auto rounded-lg p-1.5 text-text-muted hover:bg-surface-hover hover:text-danger disabled:opacity-50"
-        >
-          <Trash2 className="h-4 w-4" aria-hidden />
-        </button>
-      </div>
-      {logHabit.isError ? (
-        <p role="alert" className="mt-2 text-xs text-danger">{logHabit.error.message}</p>
-      ) : null}
-      <AnimatePresence initial={false}>
-        {showHistory ? (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.2, ease: "easeOut" }}
-            className="mt-3 overflow-hidden border-t border-border pt-3"
-          >
-            <HabitHeatmap habitId={habit.id} />
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
-    </motion.li>
+      {icon}
+      <span className="hidden sm:inline">{label}</span>
+    </button>
   );
 }
 
 export default function HabitsPage() {
   const habitsQuery = useHabits();
-  const createHabit = useCreateHabit();
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
-  const [name, setName] = useState("");
-  const [frequency, setFrequency] = useState<"daily" | "weekly">("daily");
+  const deleteHabit = useDeleteHabit();
+  const showToast = useUIStore((state) => state.showToast);
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  const submit = (event: FormEvent) => {
-    event.preventDefault();
-    const trimmed = name.trim();
-    if (!trimmed || createHabit.isPending) return;
-    createHabit.mutate(
-      { name: trimmed, frequency_type: frequency, start_date: todayString() },
-      {
-        onSuccess: () => {
-          setName("");
-          setIsModalOpen(false);
+  const [viewMode, setViewMode] = useState<ViewMode>("weekly");
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
+  const [habitToDelete, setHabitToDelete] = useState<Habit | null>(null);
+
+  const searchQuery = searchParams.get(PARAM_QUERY) ?? "";
+  const pillarFilter = searchParams.get(PARAM_PILLAR) ?? DEFAULT_PILLAR;
+  const weekOffset = parseWeekOffset(searchParams.get(PARAM_WEEK));
+
+  const updateParam = useCallback(
+    (key: string, value: string, defaultValue: string) => {
+      setSearchParams(
+        (previous) => {
+          const next = new URLSearchParams(previous);
+          if (value === defaultValue) next.delete(key);
+          else next.set(key, value);
+          return next;
         },
-      },
-    );
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
+
+  const setSearchQuery = (value: string) => updateParam(PARAM_QUERY, value, "");
+  const setPillarFilter = (value: string) => updateParam(PARAM_PILLAR, value, DEFAULT_PILLAR);
+  const setWeekOffset = (value: number) => updateParam(PARAM_WEEK, String(value), "0");
+
+  const isModalOpen = isCreateModalOpen || editingHabit !== null || habitToDelete !== null;
+
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      if (event.metaKey || event.ctrlKey || event.altKey || event.repeat) return;
+      if (event.key !== "n" && event.key !== "N") return;
+      if (isModalOpen || document.querySelector('[role="dialog"], [role="alertdialog"]')) return;
+      const target = event.target as HTMLElement | null;
+      const tag = target?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target?.isContentEditable) {
+        return;
+      }
+      setIsCreateModalOpen(true);
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [isModalOpen]);
+
+  const confirmDelete = () => {
+    if (!habitToDelete) return;
+    deleteHabit.mutate(habitToDelete.id, {
+      onSuccess: () => showToast("Habit deleted", "success"),
+      onError: (error) =>
+        showToast(error instanceof Error ? error.message : "Could not delete habit", "error"),
+      onSettled: () => setHabitToDelete(null),
+    });
   };
 
+  const habits = habitsQuery.data ?? [];
+  const activeHabits = habits.filter((h) => h.is_active);
+  const activeCount = activeHabits.length;
+  const visibleHabits = filterHabits(habits, searchQuery, pillarFilter);
+
+  const pillars = Array.from(
+    new Set(habits.map((h) => h.category).filter(Boolean) as string[]),
+  );
+
   return (
-    <div className="space-y-6">
-      <header className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-text">Habits</h1>
-        <Button size="sm" onClick={() => setIsModalOpen(true)}>
-          <Plus className="h-4 w-4" aria-hidden />
-          New habit
-        </Button>
+    <div className="space-y-5">
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 className="text-2xl font-bold text-text">Habits</h1>
+          <span className="rounded-full bg-surface-hover px-3 py-1 text-xs font-semibold text-text-muted">
+            {activeCount} Active Habit{activeCount !== 1 ? "s" : ""}
+          </span>
+          <WeeklyConsistencyBadge habits={activeHabits} />
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative hidden sm:block">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-muted" aria-hidden />
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search habits…"
+              aria-label="Search habits"
+              className="h-8 rounded-lg border border-border bg-surface pl-8 pr-3 text-xs text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/40"
+            />
+          </div>
+
+          {pillars.length > 0 ? (
+            <select
+              value={pillarFilter}
+              onChange={(e) => setPillarFilter(e.target.value)}
+              aria-label="Filter by pillar"
+              className="h-8 rounded-lg border border-border bg-surface px-2 text-xs text-text focus:outline-none focus:ring-2 focus:ring-accent/40"
+            >
+              <option value={DEFAULT_PILLAR}>All Pillars ({pillars.length})</option>
+              {pillars.map((p) => (
+                <option key={p} value={p}>{p}</option>
+              ))}
+            </select>
+          ) : null}
+
+          <div className="flex rounded-lg border border-border bg-surface overflow-hidden">
+            <ViewTab
+              active={viewMode === "weekly"}
+              onClick={() => setViewMode("weekly")}
+              icon={<LayoutGrid className="h-3.5 w-3.5" />}
+              label="Weekly"
+            />
+            <ViewTab
+              active={viewMode === "heatmap"}
+              onClick={() => setViewMode("heatmap")}
+              icon={<span className="text-[11px]">▦</span>}
+              label="Heatmap"
+            />
+          </div>
+
+          <Button size="sm" onClick={() => setIsCreateModalOpen(true)}>
+            <Plus className="h-3.5 w-3.5" aria-hidden />
+            New habit
+          </Button>
+        </div>
       </header>
 
-      <QueryStateBoundary
-        query={habitsQuery}
-        skeleton={
-          <div className="grid gap-3 sm:grid-cols-2" aria-hidden>
-            {[0, 1].map((index) => (
-              <Skeleton key={index} className="h-28 w-full" />
-            ))}
+      {habitsQuery.isPending ? (
+        <div className="space-y-4" aria-hidden>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-24 w-full" />)}
           </div>
-        }
-        empty={
-          <EmptyState
-            title="No habits yet"
-            description="Small habits compound. Create your first one."
-            action={<Button onClick={() => setIsModalOpen(true)}>Create a habit</Button>}
-          />
-        }
-      >
-        {(habits) =>
-          habits.length === 0 ? (
-            <EmptyState
-              title="No habits yet"
-              description="Small habits compound. Create your first one."
-              action={<Button onClick={() => setIsModalOpen(true)}>Create a habit</Button>}
-            />
-          ) : (
-            <ul className="grid gap-3 sm:grid-cols-2" aria-label="Habits">
-              {habits.map((habit) => (
-                <HabitCard key={habit.id} habit={habit} onEdit={() => setEditingHabit(habit)} />
-              ))}
-            </ul>
-          )
-        }
-      </QueryStateBoundary>
+          <Skeleton className="h-64 w-full" />
+        </div>
+      ) : habitsQuery.isError ? (
+        <ErrorState
+          message="Failed to load habits. Please try again."
+          onRetry={() => void habitsQuery.refetch()}
+        />
+      ) : habits.length === 0 ? (
+        <EmptyState
+          title="No habits yet"
+          description="Small habits compound. Create your first one."
+          action={<Button onClick={() => setIsCreateModalOpen(true)}>Create a habit</Button>}
+        />
+      ) : (
+        <>
+          <SummaryStatCards habits={habits} />
 
-      <Modal
-        open={isModalOpen}
-        onOpenChange={setIsModalOpen}
-        title="New habit"
-        description="You can refine the schedule later."
-      >
-        <form onSubmit={submit} className="space-y-4">
-          <Input
-            label="Name"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            placeholder="e.g. Read 20 minutes"
-            maxLength={200}
-            required
-            autoFocus
-          />
-          <div>
-            <label htmlFor="habit-frequency" className="label">Frequency</label>
-            <select
-              id="habit-frequency"
-              className="input"
-              value={frequency}
-              onChange={(event) => setFrequency(event.target.value as "daily" | "weekly")}
-            >
-              <option value="daily">Daily</option>
-              <option value="weekly">Weekly</option>
-            </select>
-          </div>
-          {createHabit.isError ? (
-            <p role="alert" className="text-sm text-danger">{createHabit.error.message}</p>
+          {viewMode === "weekly" ? (
+            <div className="hidden items-center gap-2 lg:flex">
+              <button
+                type="button"
+                onClick={() => setWeekOffset(Math.max(weekOffset - 1, MIN_WEEK_OFFSET))}
+                disabled={weekOffset <= MIN_WEEK_OFFSET}
+                aria-label="Previous week"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border text-text-muted hover:bg-surface-hover hover:text-text disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <ChevronLeft className="h-4 w-4" aria-hidden />
+              </button>
+              {weekOffset !== 0 ? (
+                <button
+                  type="button"
+                  onClick={() => setWeekOffset(0)}
+                  className="rounded-lg border border-border px-2.5 py-1 text-xs text-text-muted hover:bg-surface-hover hover:text-text"
+                >
+                  Today
+                </button>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => setWeekOffset(Math.min(weekOffset + 1, MAX_WEEK_OFFSET))}
+                disabled={weekOffset >= MAX_WEEK_OFFSET}
+                aria-label="Next week"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border text-text-muted hover:bg-surface-hover hover:text-text disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <ChevronRight className="h-4 w-4" aria-hidden />
+              </button>
+            </div>
           ) : null}
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="secondary" onClick={() => setIsModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" isLoading={createHabit.isPending} disabled={!name.trim()}>
-              Create
-            </Button>
-          </div>
-        </form>
-      </Modal>
 
-      {editingHabit ? <EditHabitModal habit={editingHabit} onClose={() => setEditingHabit(null)} /> : null}
+          <AnimatePresence mode="wait">
+            {viewMode === "weekly" ? (
+              <motion.div
+                key="weekly"
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.18 }}
+              >
+                <div className="hidden lg:block">
+                  <WeeklyGrid
+                    habits={visibleHabits}
+                    weekOffset={weekOffset}
+                    onEdit={setEditingHabit}
+                    onDelete={setHabitToDelete}
+                    onCreateNew={() => setIsCreateModalOpen(true)}
+                  />
+                </div>
+                <div className="block lg:hidden">
+                  <MobileHabitList
+                    habits={visibleHabits}
+                    onEdit={setEditingHabit}
+                    onDelete={setHabitToDelete}
+                    onCreateNew={() => setIsCreateModalOpen(true)}
+                  />
+                </div>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="heatmap"
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.18 }}
+              >
+                <HeatmapView
+                  habits={visibleHabits}
+                  onEdit={setEditingHabit}
+                  onDelete={setHabitToDelete}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </>
+      )}
+
+      <CreateHabitModal open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen} />
+
+      {editingHabit ? (
+        <EditHabitModal habit={editingHabit} onClose={() => setEditingHabit(null)} />
+      ) : null}
+
+      <ConfirmDialog
+        open={habitToDelete !== null}
+        onOpenChange={(open) => !open && setHabitToDelete(null)}
+        title={habitToDelete ? `Delete "${habitToDelete.name}"?` : "Delete habit?"}
+        description="This also permanently deletes the habit's entire log history. This cannot be undone."
+        isLoading={deleteHabit.isPending}
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }

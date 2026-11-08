@@ -11,14 +11,16 @@ async function register(page: Page, email: string) {
   await page.getByRole("button", { name: /create account/i }).click();
 }
 
-/** Logout lives in the header on desktop and behind the "More" sheet
- * (mobile bottom nav) or the Profile page on mobile. */
+/** Logout lives inside the account menu on desktop and behind the "More"
+ * sheet (mobile bottom nav) or the Profile page on mobile. */
 async function logout(page: Page) {
   const isMobile = (page.viewportSize()?.width ?? 1024) < 768;
   if (isMobile) {
     await page.getByRole("button", { name: /more/i }).click();
+  } else {
+    await page.getByRole("button", { name: /account menu/i }).click();
   }
-  await page.getByRole("button", { name: /log out/i }).click();
+  await page.getByRole("menuitem", { name: /log out/i }).or(page.getByRole("button", { name: /log out/i })).first().click();
 }
 
 /** Registration lands on onboarding - it is intentionally skippable. */
@@ -71,24 +73,40 @@ test.describe("authentication flow", () => {
 });
 
 test.describe("core modules", () => {
-  test("tasks: quick add shows the new task", async ({ page }) => {
+  test("tasks: create via the Add Task modal shows the new task", async ({ page }) => {
     const email = uniqueEmail();
     await register(page, email);
     await skipOnboarding(page);
 
+    // Task creation is a modal flow: "Add Task" opens a dialog with a Title
+    // field whose "Create task" submit stays disabled until title is non-blank.
+    const title = `E2E task ${Date.now()}`;
     await page.goto("/app/tasks");
-    await page.getByLabel("Task title").fill("E2E task");
-    await page.getByRole("button", { name: /^add$/i }).click();
-    await expect(page.getByText("E2E task")).toBeVisible();
+    await page.getByRole("button", { name: /add task/i }).click();
+    await page.getByLabel("Title").fill(title);
+    const submit = page.getByRole("button", { name: /create task/i });
+    // Mobile Chromium emulation mis-resolves hit tests inside the bottom-sheet
+    // dialog (it reports the Est. minutes input over the submit button's
+    // center, and the sheet's box oscillates while it settles). Real pointer
+    // events at the same point work - verified via page.mouse.click - so give
+    // the sheet a beat to settle and force the actionability check off on
+    // mobile only.
+    if (test.info().project.name === "mobile") {
+      await page.waitForTimeout(500);
+      await submit.click({ force: true });
+    } else {
+      await submit.click();
+    }
+    await expect(page.getByText(title)).toBeVisible();
 
     // Persistence: survives a full reload (server-side data, not just cache).
     await page.reload();
-    await expect(page.getByText("E2E task")).toBeVisible();
+    await expect(page.getByText(title)).toBeVisible();
 
-    // Validation: empty submit shows feedback instead of a dead button.
-    await page.getByLabel("Task title").fill("   ");
-    await page.getByRole("button", { name: /^add$/i }).click();
-    await expect(page.getByRole("alert")).toBeVisible();
+    // Validation: a whitespace-only title keeps the submit button disabled.
+    await page.getByRole("button", { name: /add task/i }).click();
+    await page.getByLabel("Title").fill("   ");
+    await expect(page.getByRole("button", { name: /create task/i })).toBeDisabled();
   });
 
   test("health: log a metric", async ({ page }) => {
@@ -97,7 +115,7 @@ test.describe("core modules", () => {
     await skipOnboarding(page);
 
     await page.goto("/app/health");
-    await page.getByRole("tab", { name: /weight/i }).click();
+    await page.getByRole("button", { name: /weight/i }).click();
     await page.getByLabel("Value").fill("70");
     await page.getByRole("button", { name: /^log$/i }).click();
     // Scope to the logged-metric row (list items), not the dynamic hero

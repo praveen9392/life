@@ -1,0 +1,17 @@
+{
+  "id": "910979bf-126a-457f-aa62-6105c6f04f2e",
+  "email": "ux.audit@example.com",
+  "full_name": "Ava Morgan",
+  "avatar_url": null,
+  "timezone": "UTC",
+  "theme_preference": "system",
+  "notification_preferences": {
+    "task_due_soon": true,
+    "habit_reminder": true,
+    "learning_reminder": true,
+    "workout_reminder": true,
+    "goal_deadline_approaching": true
+  },
+  "onboarding_completed_at": null,
+  "created_at": "2026-11-08T04:11:43.853681Z"
+}

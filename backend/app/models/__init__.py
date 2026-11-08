@@ -6,6 +6,7 @@ from app.models.habit import Habit, HabitLog
 from app.models.health import HealthMetric
 from app.models.learning import Course, CourseLesson, CourseModule, LearningItem, LearningSession
 from app.models.note import Note
+from app.models.note_directory import NoteDirectory
 from app.models.notification import Notification
 from app.models.tag import NoteTag, Tag, TaskTag
 from app.models.task import Task
@@ -23,6 +24,7 @@ __all__ = [
     "TaskTag",
     "NoteTag",
     "Note",
+    "NoteDirectory",
     "HealthMetric",
     "Exercise",
     "Workout",

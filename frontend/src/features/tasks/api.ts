@@ -1,4 +1,5 @@
 import { httpClient } from "../../services/api/httpClient";
+import type { Tag } from "../tags/api";
 
 export type TaskPriority = "low" | "medium" | "high" | "urgent";
 export type TaskStatus = "pending" | "in_progress" | "completed" | "cancelled";
@@ -22,6 +23,7 @@ export interface Task {
   is_recurring_template: boolean;
   recurrence_rule: RecurrenceRule | null;
   recurrence_template_id: string | null;
+  tags: Tag[];
   completed_at: string | null;
   created_at: string;
   updated_at: string;
@@ -43,6 +45,8 @@ export interface TaskCreateInput {
   due_time?: string | null;
   estimated_duration_minutes?: number | null;
   recurrence_rule?: RecurrenceRule | null;
+  /** Omit to leave tags untouched; pass `[]` to clear all tags. */
+  tag_ids?: string[];
 }
 
 export type TaskUpdateInput = Partial<TaskCreateInput> & { status?: TaskStatus };
@@ -87,5 +91,7 @@ export const tasksApi = {
   create: (input: TaskCreateInput) => httpClient.post<Task>("/api/v1/tasks", input),
   update: (taskId: string, input: TaskUpdateInput) =>
     httpClient.patch<Task>(`/api/v1/tasks/${taskId}`, input),
+  updateTemplate: (templateId: string, input: TaskUpdateInput) =>
+    httpClient.patch<Task>(`/api/v1/tasks/templates/${templateId}`, input),
   remove: (taskId: string) => httpClient.delete(`/api/v1/tasks/${taskId}`),
 };

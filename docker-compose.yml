@@ -34,6 +34,13 @@ services:
       RATE_LIMIT_ENABLED: "true"
     ports:
       - "8000:8000"
+    healthcheck:
+      # python:3.11-slim has no curl; probe the no-auth liveness route with urllib.
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
 
   frontend:
     build:

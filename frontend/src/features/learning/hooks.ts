@@ -8,7 +8,6 @@ import {
 
 export const LEARNING_ITEMS_KEY = ["learning", "items"] as const;
 export const COURSES_KEY = ["learning", "courses"] as const;
-export const LEARNING_SESSIONS_KEY = ["learning", "sessions"] as const;
 
 export function useLearningItems() {
   return useQuery({
@@ -34,19 +33,13 @@ export function useCourse(courseId: string | null) {
   });
 }
 
-export function useLearningSessions() {
-  return useQuery({
-    queryKey: LEARNING_SESSIONS_KEY,
-    queryFn: ({ signal }) => learningApi.listSessions(signal),
-    staleTime: 30 * 1000,
-  });
-}
-
 function useInvalidateLearning() {
   const queryClient = useQueryClient();
   return () => {
     void queryClient.invalidateQueries({ queryKey: ["learning"] });
     void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+    void queryClient.invalidateQueries({ queryKey: ["calendar"] });
+    void queryClient.invalidateQueries({ queryKey: ["analytics"] });
   };
 }
 

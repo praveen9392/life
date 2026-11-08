@@ -1,6 +1,6 @@
 """Dashboard API tests: aggregation correctness and isolation."""
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from httpx import AsyncClient
@@ -59,6 +59,31 @@ async def test_dashboard_summary_shape_and_counts(api_client: AsyncClient, user_
     assert len(body["habits"]) == 1
     assert body["habits"][0]["status"] == "completed"
     assert {task["title"] for task in body["tasks_today"]} == {"Done", "Pending"}
+
+
+async def test_dashboard_best_streak_spans_week_boundary(api_client: AsyncClient, user_a) -> None:  # type: ignore[no-untyped-def]
+    # A 10-day completed streak must not be truncated at the current week's
+    # start: the dashboard previously computed streaks from this week's logs
+    # only, understating every streak that began in a prior week.
+    today = datetime.now(UTC).date()
+    start = today - timedelta(days=9)
+    habit = await api_client.post(
+        "/api/v1/habits",
+        json={"name": "Read", "frequency_type": "daily", "start_date": start.isoformat()},
+        headers=csrf_headers(api_client),
+    )
+    habit_id = habit.json()["id"]
+    for offset in range(10):
+        day = (today - timedelta(days=offset)).isoformat()
+        await api_client.put(
+            f"/api/v1/habits/{habit_id}/log/{day}",
+            json={"status": "completed"},
+            headers=csrf_headers(api_client),
+        )
+
+    summary = await api_client.get("/api/v1/dashboard/summary")
+    assert summary.status_code == 200, summary.text
+    assert summary.json()["best_current_streak"] == 10
 
 
 async def test_dashboard_is_empty_and_zeroed_for_new_user(api_client: AsyncClient, user_a) -> None:  # type: ignore[no-untyped-def]

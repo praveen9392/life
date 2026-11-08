@@ -1,10 +1,12 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { motion } from "framer-motion";
 import { CheckSquare, Plus, Square, Target, Trash2 } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
 
 import { EmptyState } from "../../../components/common/EmptyState";
 import { QueryStateBoundary } from "../../../components/common/QueryStateBoundary";
 import { Button } from "../../../components/ui/Button";
+import { ConfirmDialog } from "../../../components/ui/ConfirmDialog";
 import { Input } from "../../../components/ui/Input";
 import { Modal } from "../../../components/ui/Modal";
 import { Skeleton } from "../../../components/ui/Skeleton";
@@ -26,11 +28,20 @@ const STATUS_TABS: Array<{ value: GoalStatus | undefined; label: string }> = [
   { value: "abandoned", label: "Abandoned" },
 ];
 
+function isGoalStatus(value: string | null): value is GoalStatus {
+  return STATUS_TABS.some((tab) => tab.value === value && value !== null);
+}
+
+function isProgressMode(value: string): value is "manual" | "milestones" {
+  return value === "manual" || value === "milestones";
+}
+
 function GoalCard({ goal }: { goal: Goal }) {
   const toggleMilestone = useToggleMilestone();
   const addMilestone = useAddMilestone();
   const deleteGoal = useDeleteGoal();
   const [draft, setDraft] = useState("");
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const addMilestoneSubmit = (event: FormEvent) => {
     event.preventDefault();
@@ -55,14 +66,22 @@ function GoalCard({ goal }: { goal: Goal }) {
         </div>
         <button
           type="button"
-          onClick={() => deleteGoal.mutate(goal.id)}
-          disabled={deleteGoal.isPending}
+          onClick={() => setConfirmOpen(true)}
           aria-label={`Delete goal "${goal.title}"`}
-          className="rounded-lg p-1.5 text-text-muted hover:bg-surface-hover hover:text-danger disabled:opacity-50"
+          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-text-muted hover:bg-surface-hover hover:text-danger disabled:opacity-50"
         >
           <Trash2 className="h-4 w-4" aria-hidden />
         </button>
       </div>
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title="Delete goal?"
+        description={`"${goal.title}" and its milestones will be permanently deleted.`}
+        confirmLabel="Delete"
+        isLoading={deleteGoal.isPending}
+        onConfirm={() => deleteGoal.mutate(goal.id, { onSuccess: () => setConfirmOpen(false) })}
+      />
 
       <div className="mt-2 flex items-center gap-2">
         <div
@@ -95,7 +114,7 @@ function GoalCard({ goal }: { goal: Goal }) {
                 }
                 aria-pressed={milestone.is_completed}
                 aria-label={`Toggle milestone "${milestone.title}"`}
-                className="text-text-muted hover:text-accent disabled:opacity-50"
+                className="inline-flex h-6 w-6 items-center justify-center text-text-muted hover:text-accent disabled:opacity-50"
               >
                 {milestone.is_completed ? (
                   <CheckSquare className="h-4 w-4 text-accent" aria-hidden />
@@ -134,7 +153,15 @@ export default function GoalsPage() {
   const goalsQuery = useGoals();
   const createGoal = useCreateGoal();
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<GoalStatus | undefined>(undefined);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const statusParam = searchParams.get("status");
+  const statusFilter = isGoalStatus(statusParam) ? statusParam : undefined;
+  const selectStatus = (status: GoalStatus | undefined) => {
+    const next = new URLSearchParams(searchParams);
+    if (status) next.set("status", status);
+    else next.delete("status");
+    setSearchParams(next, { replace: true });
+  };
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("");
   const [targetDate, setTargetDate] = useState("");
@@ -188,14 +215,13 @@ export default function GoalsPage() {
         </Button>
       </header>
 
-      <div role="tablist" aria-label="Filter goals by status" className="flex flex-wrap gap-1">
+      <div role="group" aria-label="Filter goals by status" className="flex flex-wrap gap-1">
         {STATUS_TABS.map((tab) => (
           <button
             key={tab.label}
             type="button"
-            role="tab"
-            aria-selected={statusFilter === tab.value}
-            onClick={() => setStatusFilter(tab.value)}
+            aria-pressed={statusFilter === tab.value}
+            onClick={() => selectStatus(tab.value)}
             className={cn(
               "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
               statusFilter === tab.value
@@ -217,6 +243,7 @@ export default function GoalsPage() {
             ))}
           </div>
         }
+        isEmpty={(goals) => goals.length === 0}
         empty={
           <EmptyState
             icon={<Target className="h-8 w-8" aria-hidden />}
@@ -227,14 +254,7 @@ export default function GoalsPage() {
         }
       >
         {() =>
-          allGoals.length === 0 ? (
-            <EmptyState
-              icon={<Target className="h-8 w-8" aria-hidden />}
-              title="No goals yet"
-              description="Define what you want to achieve, then break it into milestones."
-              action={<Button onClick={() => setIsModalOpen(true)}>Create a goal</Button>}
-            />
-          ) : filteredGoals.length === 0 ? (
+          filteredGoals.length === 0 ? (
             <EmptyState title="No goals in this status" description="Try a different filter." />
           ) : (
             <ul className="grid gap-3 sm:grid-cols-2" aria-label="Goals">
@@ -276,7 +296,9 @@ export default function GoalsPage() {
               id="progress-mode"
               className="input"
               value={progressMode}
-              onChange={(event) => setProgressMode(event.target.value as "manual" | "milestones")}
+              onChange={(event) => {
+                if (isProgressMode(event.target.value)) setProgressMode(event.target.value);
+              }}
             >
               <option value="milestones">Milestones</option>
               <option value="manual">Manual percentage</option>

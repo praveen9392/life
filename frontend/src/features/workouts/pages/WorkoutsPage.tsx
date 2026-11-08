@@ -9,7 +9,10 @@ import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
 import { Modal } from "../../../components/ui/Modal";
 import { Skeleton } from "../../../components/ui/Skeleton";
+import { ConfirmDialog } from "../../../components/ui/ConfirmDialog";
 import { useChartColors } from "../../../hooks/useChartColors";
+import { useUIStore } from "../../../stores/uiStore";
+import { isoWeekKey } from "../../habits/habitUtils";
 import type { Exercise, WorkoutSession, WorkoutSetInput } from "../api";
 import {
   useCreateExercise,
@@ -18,16 +21,6 @@ import {
   useExercises,
   useWorkoutSessions,
 } from "../hooks";
-
-/** Monday-anchored ISO week key, e.g. "2026-W01". */
-function isoWeekKey(date: Date): string {
-  const copy = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-  const dayNum = (copy.getUTCDay() + 6) % 7;
-  copy.setUTCDate(copy.getUTCDate() - dayNum + 3);
-  const firstThursday = new Date(Date.UTC(copy.getUTCFullYear(), 0, 4));
-  const week = 1 + Math.round(((copy.getTime() - firstThursday.getTime()) / 86400000 - 3 + ((firstThursday.getUTCDay() + 6) % 7)) / 7);
-  return `${copy.getUTCFullYear()}-W${String(week).padStart(2, "0")}`;
-}
 
 function weekLabel(date: Date): string {
   return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
@@ -106,6 +99,7 @@ function SessionForm({ onDone }: { onDone: () => void }) {
   const exercisesQuery = useExercises();
   const createExercise = useCreateExercise();
   const createSession = useCreateSession();
+  const showToast = useUIStore((state) => state.showToast);
   const [durationMinutes, setDurationMinutes] = useState("");
   const [notes, setNotes] = useState("");
   const [newExerciseName, setNewExerciseName] = useState("");
@@ -119,9 +113,14 @@ function SessionForm({ onDone }: { onDone: () => void }) {
   const addExercise = async () => {
     const name = newExerciseName.trim();
     if (!name) return;
-    const exercise = await createExercise.mutateAsync({ name });
-    setNewExerciseName("");
-    return exercise.id;
+    try {
+      const exercise = await createExercise.mutateAsync({ name });
+      setNewExerciseName("");
+      return exercise.id;
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Could not add exercise", "error");
+      return undefined;
+    }
   };
 
   const submit = (event: FormEvent) => {
@@ -142,7 +141,11 @@ function SessionForm({ onDone }: { onDone: () => void }) {
         notes: notes || null,
         sets: setInputs,
       },
-      { onSuccess: onDone },
+      {
+        onSuccess: onDone,
+        onError: (error) =>
+          showToast(error instanceof Error ? error.message : "Could not log workout", "error"),
+      },
     );
   };
 
@@ -166,6 +169,11 @@ function SessionForm({ onDone }: { onDone: () => void }) {
 
       <fieldset className="space-y-2">
         <legend className="label">Sets</legend>
+        {exercisesQuery.isError ? (
+          <p role="alert" className="text-sm text-danger">
+            Unable to load the exercise catalog. You can still add a new exercise below.
+          </p>
+        ) : null}
         {sets.map((set, index) => (
           <div key={index} className="flex items-end gap-2">
             <div className="flex-1">
@@ -336,7 +344,18 @@ export default function WorkoutsPage() {
   const sessionsQuery = useWorkoutSessions();
   const exercisesQuery = useExercises();
   const deleteSession = useDeleteSession();
+  const showToast = useUIStore((state) => state.showToast);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [sessionToDelete, setSessionToDelete] = useState<WorkoutSession | null>(null);
+
+  const confirmDeleteSession = () => {
+    if (!sessionToDelete) return;
+    deleteSession.mutate(sessionToDelete.id, {
+      onError: (error) =>
+        showToast(error instanceof Error ? error.message : "Could not delete workout", "error"),
+      onSettled: () => setSessionToDelete(null),
+    });
+  };
 
   const sessionsThisWeek = (sessionsQuery.data?.items ?? []).filter(
     (session) =>
@@ -371,6 +390,7 @@ export default function WorkoutsPage() {
             ))}
           </div>
         }
+        isEmpty={(page) => page.items.length === 0}
         empty={
           <EmptyState
             title="No workouts logged"
@@ -379,60 +399,51 @@ export default function WorkoutsPage() {
           />
         }
       >
-        {(page) =>
-          page.items.length === 0 ? (
-            <EmptyState
-              title="No workouts logged"
-              description="Log your first session to start tracking."
-              action={<Button onClick={() => setIsModalOpen(true)}>Log a workout</Button>}
-            />
-          ) : (
-            <div className="space-y-4">
-              <FrequencyChart sessions={page.items} />
-              <PersonalRecordsSection sessions={page.items} exercises={exercisesQuery.data ?? []} />
-              <ul className="space-y-3" aria-label="Workout sessions">
-                {page.items.map((session) => (
-                  <motion.li
-                    key={session.id}
-                    whileHover={{ y: -2 }}
-                    className="rounded-card border border-border bg-surface p-4 transition-shadow hover:shadow-md"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="font-medium text-text">{formatPerformedAt(session.performed_at)}</p>
-                        <p className="mt-0.5 text-xs text-text-muted">
-                          {session.duration_minutes ? `${session.duration_minutes} min · ` : ""}
-                          {session.sets.length} set{session.sets.length === 1 ? "" : "s"}
-                          {session.notes ? ` · ${session.notes}` : ""}
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => deleteSession.mutate(session.id)}
-                        disabled={deleteSession.isPending}
-                        aria-label="Delete workout session"
-                        className="rounded-lg p-1.5 text-text-muted hover:bg-surface-hover hover:text-danger disabled:opacity-50"
-                      >
-                        <Trash2 className="h-4 w-4" aria-hidden />
-                      </button>
+        {(page) => (
+          <div className="space-y-4">
+            <FrequencyChart sessions={page.items} />
+            <PersonalRecordsSection sessions={page.items} exercises={exercisesQuery.data ?? []} />
+            <ul className="space-y-3" aria-label="Workout sessions">
+              {page.items.map((session) => (
+                <motion.li
+                  key={session.id}
+                  whileHover={{ y: -2 }}
+                  className="rounded-card border border-border bg-surface p-4 transition-shadow hover:shadow-md"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-medium text-text">{formatPerformedAt(session.performed_at)}</p>
+                      <p className="mt-0.5 text-xs text-text-muted">
+                        {session.duration_minutes ? `${session.duration_minutes} min · ` : ""}
+                        {session.sets.length} set{session.sets.length === 1 ? "" : "s"}
+                        {session.notes ? ` · ${session.notes}` : ""}
+                      </p>
                     </div>
-                    {session.sets.length > 0 ? (
-                      <ul className="mt-2 space-y-1 text-sm text-text-muted">
-                        {session.sets.map((set) => (
-                          <li key={set.id}>
-                            Set {set.set_number}
-                            {set.reps ? ` · ${set.reps} reps` : ""}
-                            {set.weight ? ` · ${set.weight} ${set.weight_unit ?? "kg"}` : ""}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : null}
-                  </motion.li>
-                ))}
-              </ul>
-            </div>
-          )
-        }
+                    <button
+                      type="button"
+                      onClick={() => setSessionToDelete(session)}
+                      aria-label="Delete workout session"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-text-muted hover:bg-surface-hover hover:text-danger"
+                    >
+                      <Trash2 className="h-4 w-4" aria-hidden />
+                    </button>
+                  </div>
+                  {session.sets.length > 0 ? (
+                    <ul className="mt-2 space-y-1 text-sm text-text-muted">
+                      {session.sets.map((set) => (
+                        <li key={set.id}>
+                          Set {set.set_number}
+                          {set.reps ? ` · ${set.reps} reps` : ""}
+                          {set.weight ? ` · ${set.weight} ${set.weight_unit ?? "kg"}` : ""}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </motion.li>
+              ))}
+            </ul>
+          </div>
+        )}
       </QueryStateBoundary>
 
       <Modal
@@ -443,6 +454,15 @@ export default function WorkoutsPage() {
       >
         <SessionForm onDone={() => setIsModalOpen(false)} />
       </Modal>
+
+      <ConfirmDialog
+        open={sessionToDelete !== null}
+        onOpenChange={(open) => !open && setSessionToDelete(null)}
+        title="Delete workout session?"
+        description="This session and all of its sets will be permanently deleted."
+        isLoading={deleteSession.isPending}
+        onConfirm={confirmDeleteSession}
+      />
     </div>
   );
 }

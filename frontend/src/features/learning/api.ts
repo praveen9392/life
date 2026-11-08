@@ -1,5 +1,4 @@
 import { httpClient } from "../../services/api/httpClient";
-import type { Page } from "../tasks/api";
 
 export type LearningItemType = "book" | "technology" | "topic" | "project";
 export type LearningItemStatus = "not_started" | "in_progress" | "completed";
@@ -77,8 +76,6 @@ export const learningApi = {
   updateLesson: (lessonId: string, input: { status?: LessonStatus; title?: string }) =>
     httpClient.patch<Lesson>(`/api/v1/learning/lessons/${lessonId}`, input),
 
-  listSessions: (signal?: AbortSignal) =>
-    httpClient.get<Page<LearningSession>>("/api/v1/learning/sessions?page_size=50", signal),
   logSession: (input: {
     course_id?: string;
     topic?: string;

@@ -7,6 +7,7 @@ import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
 import { ApiError } from "../../../services/api/httpClient";
 import type { NotificationPreferences, ThemePreference } from "../../../types/user";
+import { TIMEZONES } from "../../../utils/timezones";
 import { useCurrentUser, useLogout } from "../../auth/hooks";
 import { useChangePassword, useDeleteAccount, useExportData, useRevokeSession, useSessions, useUpdateProfile } from "../hooks";
 
@@ -21,17 +22,6 @@ const passwordSchema = z
   });
 
 type PasswordForm = z.infer<typeof passwordSchema>;
-
-const TIMEZONES = [
-  "UTC",
-  "Asia/Kolkata",
-  "Europe/London",
-  "Europe/Berlin",
-  "America/New_York",
-  "America/Los_Angeles",
-  "Asia/Tokyo",
-  "Australia/Sydney",
-];
 
 function ProfileInfoSection() {
   const { data: user } = useCurrentUser();
@@ -101,7 +91,7 @@ function ProfileInfoSection() {
             Save changes
           </Button>
           {saved ? (
-            <span className="text-sm text-success" role="status">
+            <span className="text-sm text-success-text" role="status">
               Saved
             </span>
           ) : null}
@@ -158,7 +148,7 @@ function PreferencesSection() {
 
       <fieldset className="space-y-3">
         <legend className="label">Theme</legend>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-1 gap-2 xs:grid-cols-3">
           {(["light", "dark", "system"] as ThemePreference[]).map((option) => (
             <label
               key={option}
@@ -197,7 +187,7 @@ function PreferencesSection() {
         ))}
       </fieldset>
       {saved ? (
-        <p className="mt-3 text-sm text-success" role="status">
+        <p className="mt-3 text-sm text-success-text" role="status">
           Saved
         </p>
       ) : null}
@@ -264,7 +254,7 @@ function SecuritySection() {
             Change password
           </Button>
           {passwordChanged ? (
-            <span className="text-sm text-success" role="status">
+            <span className="text-sm text-success-text" role="status">
               Changed - log in again on other devices
             </span>
           ) : null}
@@ -309,6 +299,7 @@ function PrivacySection() {
   const deleteAccount = useDeleteAccount();
   const [confirming, setConfirming] = useState(false);
   const [confirmText, setConfirmText] = useState("");
+  const [password, setPassword] = useState("");
 
   return (
     <section className="card" aria-labelledby="privacy-heading">
@@ -323,22 +314,33 @@ function PrivacySection() {
           Export my data
         </Button>
         {confirming ? (
-          <div className="flex flex-1 items-center gap-2">
+          <div className="flex flex-1 flex-wrap items-center gap-2">
             <Input
               value={confirmText}
               onChange={(event) => setConfirmText(event.target.value)}
               placeholder='Type "delete" to confirm'
               aria-label="Confirm account deletion"
             />
+            <Input
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="Current password"
+              aria-label="Current password"
+              autoComplete="current-password"
+            />
             <Button
               variant="danger"
-              disabled={confirmText !== "delete"}
+              disabled={confirmText !== "delete" || password.length === 0}
               isLoading={deleteAccount.isPending}
-              onClick={() => deleteAccount.mutate()}
+              onClick={() => deleteAccount.mutate({ current_password: password })}
             >
               Delete forever
             </Button>
-            <Button variant="ghost" onClick={() => { setConfirming(false); setConfirmText(""); }}>
+            <Button
+              variant="ghost"
+              onClick={() => { setConfirming(false); setConfirmText(""); setPassword(""); }}
+            >
               Cancel
             </Button>
           </div>
@@ -350,6 +352,9 @@ function PrivacySection() {
       </div>
       {exportData.isError ? (
         <p role="alert" className="mt-3 text-sm text-danger">{exportData.error.message}</p>
+      ) : null}
+      {deleteAccount.isError ? (
+        <p role="alert" className="mt-3 text-sm text-danger">{deleteAccount.error.message}</p>
       ) : null}
     </section>
   );

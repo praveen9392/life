@@ -58,6 +58,15 @@ export function useUpdateTask() {
   });
 }
 
+export function useUpdateRecurrenceTemplate() {
+  const invalidate = useInvalidateTasks();
+  return useMutation({
+    mutationFn: ({ templateId, input }: { templateId: string; input: TaskUpdateInput }) =>
+      tasksApi.updateTemplate(templateId, input),
+    onSuccess: invalidate,
+  });
+}
+
 export function useDeleteTask() {
   const invalidate = useInvalidateTasks();
   return useMutation({

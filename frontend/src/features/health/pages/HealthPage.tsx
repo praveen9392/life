@@ -14,6 +14,7 @@ import {
 import { EmptyState } from "../../../components/common/EmptyState";
 import { QueryStateBoundary } from "../../../components/common/QueryStateBoundary";
 import { Button } from "../../../components/ui/Button";
+import { ConfirmDialog } from "../../../components/ui/ConfirmDialog";
 import { Input } from "../../../components/ui/Input";
 import { Skeleton } from "../../../components/ui/Skeleton";
 import { useChartColors } from "../../../hooks/useChartColors";
@@ -139,6 +140,7 @@ export default function HealthPage() {
   const createMetric = useCreateHealthMetric();
   const deleteMetric = useDeleteHealthMetric();
 
+  const [pendingDeleteId, setPendingDeleteId] = useState<HealthMetric["id"] | null>(null);
   const [value, setValue] = useState("");
   const [unit, setUnit] = useState(DEFAULT_UNITS.weight);
   const [note, setNote] = useState("");
@@ -163,18 +165,23 @@ export default function HealthPage() {
     <div className="space-y-6">
       <header>
         <h1 className="text-2xl font-semibold text-text">Health</h1>
-        <p className="mt-1 text-sm text-text-muted">
-          {buildHeroSummary(allMetricsQuery.data?.items ?? [])}
-        </p>
+        {allMetricsQuery.isError ? (
+          <p role="alert" className="mt-1 text-sm text-danger">
+            Unable to load your health summary.
+          </p>
+        ) : (
+          <p className="mt-1 text-sm text-text-muted">
+            {buildHeroSummary(allMetricsQuery.data?.items ?? [])}
+          </p>
+        )}
       </header>
 
-      <div role="tablist" aria-label="Metric type" className="flex flex-wrap gap-1">
+      <div role="group" aria-label="Metric type" className="flex flex-wrap gap-1">
         {METRIC_TABS.map((tab) => (
           <button
             key={tab.label}
             type="button"
-            role="tab"
-            aria-selected={metricType === tab.value}
+            aria-pressed={metricType === tab.value}
             onClick={() => selectTab(tab.value)}
             className={cn(
               "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
@@ -240,49 +247,60 @@ export default function HealthPage() {
             ))}
           </div>
         }
+        isEmpty={(page) => page.items.length === 0}
         empty={
           <EmptyState title="No entries yet" description="Log a metric above to start tracking." />
         }
       >
-        {(page) =>
-          page.items.length === 0 ? (
-            <EmptyState title="No entries yet" description="Log a metric above to start tracking." />
-          ) : (
-            <div className="space-y-4">
-              {metricType ? <MetricTrendChart metrics={page.items} type={metricType} /> : null}
-              <ul className="space-y-2" aria-label="Health metrics">
-                {page.items.map((metric) => (
-                  <motion.li
-                    key={metric.id}
-                    whileHover={{ y: -1 }}
-                    className="flex items-center gap-3 rounded-lg border border-border bg-surface px-3 py-2.5 transition-shadow hover:shadow-sm"
+        {(page) => (
+          <div className="space-y-4">
+            {metricType ? <MetricTrendChart metrics={page.items} type={metricType} /> : null}
+            <ul className="space-y-2" aria-label="Health metrics">
+              {page.items.map((metric) => (
+                <motion.li
+                  key={metric.id}
+                  whileHover={{ y: -1 }}
+                  className="flex items-center gap-3 rounded-lg border border-border bg-surface px-3 py-2.5 transition-shadow hover:shadow-sm"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-text">
+                      {metric.value} {metric.unit}
+                      <span className="ml-2 font-normal text-text-muted">{metric.metric_type}</span>
+                    </p>
+                    <p className="text-xs text-text-muted">
+                      {formatRecordedAt(metric.recorded_at)}
+                      {metric.note ? ` · ${metric.note}` : ""}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setPendingDeleteId(metric.id)}
+                    aria-label={`Delete ${metric.metric_type} entry`}
+                    className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-text-muted hover:bg-surface-hover hover:text-danger disabled:opacity-50"
                   >
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-text">
-                        {metric.value} {metric.unit}
-                        <span className="ml-2 font-normal text-text-muted">{metric.metric_type}</span>
-                      </p>
-                      <p className="text-xs text-text-muted">
-                        {formatRecordedAt(metric.recorded_at)}
-                        {metric.note ? ` · ${metric.note}` : ""}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => deleteMetric.mutate(metric.id)}
-                      disabled={deleteMetric.isPending}
-                      aria-label={`Delete ${metric.metric_type} entry`}
-                      className="rounded-lg p-1.5 text-text-muted hover:bg-surface-hover hover:text-danger disabled:opacity-50"
-                    >
-                      <Trash2 className="h-4 w-4" aria-hidden />
-                    </button>
-                  </motion.li>
-                ))}
-              </ul>
-            </div>
-          )
-        }
+                    <Trash2 className="h-4 w-4" aria-hidden />
+                  </button>
+                </motion.li>
+              ))}
+            </ul>
+          </div>
+        )}
       </QueryStateBoundary>
+
+      <ConfirmDialog
+        open={pendingDeleteId !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingDeleteId(null);
+        }}
+        title="Delete entry?"
+        description="This health entry will be permanently deleted."
+        confirmLabel="Delete"
+        isLoading={deleteMetric.isPending}
+        onConfirm={() => {
+          if (pendingDeleteId === null) return;
+          deleteMetric.mutate(pendingDeleteId, { onSuccess: () => setPendingDeleteId(null) });
+        }}
+      />
     </div>
   );
 }

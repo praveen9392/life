@@ -19,6 +19,10 @@ const registerSchema = z.object({
 
 type RegisterForm = z.infer<typeof registerSchema>;
 
+function isRegisterField(field: string): field is keyof RegisterForm {
+  return field in registerSchema.shape;
+}
+
 export default function RegisterPage() {
   const navigate = useNavigate();
   const registerMutation = useRegister();
@@ -37,7 +41,7 @@ export default function RegisterPage() {
     } catch (error) {
       if (error instanceof ApiError && error.fields) {
         for (const [field, message] of Object.entries(error.fields)) {
-          setError(field as keyof RegisterForm, { message });
+          if (isRegisterField(field)) setError(field, { message });
         }
       }
       const message = error instanceof ApiError ? error.message : "Registration failed. Please try again.";

@@ -92,3 +92,8 @@ class HabitLogResponse(BaseModel):
     log_date: date
     status: HabitLogStatus
     note: str | None
+
+
+class HabitStreakResponse(BaseModel):
+    current_streak: int
+    longest_streak: int

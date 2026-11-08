@@ -9,6 +9,7 @@ connection/transaction is reused for speed.
 """
 
 import os
+from collections.abc import AsyncIterator
 
 from dotenv import load_dotenv
 
@@ -34,7 +35,7 @@ from app.models.user import User  # noqa: E402
 
 
 @pytest_asyncio.fixture
-async def db_session() -> AsyncSession:
+async def db_session() -> AsyncIterator[AsyncSession]:
     """A database session whose changes are always rolled back after the test.
 
     A fresh engine (NullPool - no cross-test connection pooling) is created
@@ -58,7 +59,7 @@ async def db_session() -> AsyncSession:
 
 
 @pytest_asyncio.fixture
-async def api_client(db_session: AsyncSession) -> httpx.AsyncClient:
+async def api_client(db_session: AsyncSession) -> AsyncIterator[httpx.AsyncClient]:
     """An httpx client talking to the real ASGI app, with the DB dependency
     overridden to the test session (so API tests hit the rolled-back
     transaction, exactly like every other test).
@@ -125,7 +126,7 @@ async def register_and_login(
 
     from app.repositories.user_repository import UserRepository
 
-    user = await UserRepository(db_session).get_by_email(email)
+    user = await UserRepository(db_session).get_by_email_query(email)
     assert user is not None
     return user
 

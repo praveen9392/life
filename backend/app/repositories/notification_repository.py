@@ -3,7 +3,7 @@
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 
 from app.models.notification import Notification
 from app.repositories.base import BaseRepository
@@ -12,7 +12,7 @@ from app.repositories.base import BaseRepository
 class NotificationRepository(BaseRepository[Notification]):
     model = Notification
 
-    async def list_for_user(
+    async def list_for_user_query(
         self,
         user_id: uuid.UUID,
         *,
@@ -20,6 +20,7 @@ class NotificationRepository(BaseRepository[Notification]):
         offset: int = 0,
         limit: int = 50,
     ) -> list[Notification]:
+        """List the user's notifications, newest first, optionally unread-only, as one page."""
         query = (
             self._base_query(user_id)
             .order_by(Notification.created_at.desc())
@@ -28,22 +29,34 @@ class NotificationRepository(BaseRepository[Notification]):
         )
         if unread_only:
             query = query.where(Notification.is_read.is_(False))
-        return list((await self.session.execute(query)).scalars().all())
+        query_result = await self.session.execute(query)
+        matching_records = query_result.scalars().all()
+        return list(matching_records)
 
-    async def count_unread(self, user_id: uuid.UUID) -> int:
+    async def count_unread_query(self, user_id: uuid.UUID) -> int:
+        """Count the user's unread notifications (badge count)."""
         query = select(func.count()).select_from(Notification).where(
             Notification.user_id == user_id, Notification.is_read.is_(False)
         )
-        return int((await self.session.execute(query)).scalar_one())
+        query_result = await self.session.execute(query)
+        total_count = query_result.scalar_one()
+        return int(total_count)
 
-    async def mark_all_read(self, user_id: uuid.UUID) -> int:
-        rows = await self.list_for_user(user_id, unread_only=True, limit=1000)
-        for notification in rows:
-            notification.is_read = True
-        await self.session.flush()
-        return len(rows)
+    async def mark_all_read_query(self, user_id: uuid.UUID) -> int:
+        """Mark every unread notification read in one UPDATE, returning how many changed."""
+        # One UPDATE covers every unread row - paging SELECTs + ORM writes
+        # would need N round-trips and could still race new inserts.
+        result = await self.session.execute(
+            update(Notification)
+            .where(Notification.user_id == user_id, Notification.is_read.is_(False))
+            .values(is_read=True)
+        )
+        return result.rowcount
 
-    async def create_notification(self, user_id: uuid.UUID, **fields: object) -> Notification:
+    async def create_notification_query(self, user_id: uuid.UUID, **fields: object) -> Notification:
+        """Insert a notification with an explicit live `created_at` (the column's frozen
+        server default is unreliable - see the comment below).
+        """
         # `created_at` is set explicitly here rather than relying on the
         # column's DB `server_default` - see ARCHITECTURE.md / AGENTS.md:
         # the initial migration defines that default as the bare string
@@ -62,7 +75,7 @@ class NotificationRepository(BaseRepository[Notification]):
         await self.session.flush()
         return notification
 
-    async def exists_recent(
+    async def exists_recent_query(
         self, user_id: uuid.UUID, notification_type: object, since: object
     ) -> bool:
         """Dedup guard: has a notification of this type been created since `since`?"""
@@ -71,4 +84,6 @@ class NotificationRepository(BaseRepository[Notification]):
             Notification.type == notification_type,
             Notification.created_at >= since,
         )
-        return (await self.session.execute(query)).scalar_one() > 0
+        query_result = await self.session.execute(query)
+        scalar_value = query_result.scalar_one()
+        return scalar_value > 0

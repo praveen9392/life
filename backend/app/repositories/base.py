@@ -64,13 +64,9 @@ class BaseRepository(Generic[ModelT]):
             query = query.where(deleted_at.is_(None))
         return query
 
-    async def get_owned(self, entity_id: uuid.UUID, user_id: uuid.UUID) -> ModelT | None:
-        """Fetch a single row, but only if it belongs to `user_id`.
-
-        Returns None both when the row doesn't exist AND when it belongs to
-        someone else - callers must not distinguish the two (see the
-        two-user isolation testing checklist in the project plan): both
-        cases should surface as a 404 `NotFoundError`, never a 403.
+    async def get_owned_query(self, entity_id: uuid.UUID, user_id: uuid.UUID) -> ModelT | None:
+        """Fetch a single row only if it belongs to `user_id`; None covers both a missing and a
+        foreign row (callers must not distinguish the two - both surface as a 404, never a 403).
         """
         query = self._base_query(user_id).where(
             getattr(self.model, "id") == entity_id  # noqa: B009 - mypy workaround, see _base_query
@@ -78,7 +74,7 @@ class BaseRepository(Generic[ModelT]):
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
 
-    async def list_owned(
+    async def list_owned_query(
         self,
         user_id: uuid.UUID,
         *,
@@ -98,7 +94,7 @@ class BaseRepository(Generic[ModelT]):
         rows = (await self.session.execute(page_query)).scalars().all()
         return list(rows), total
 
-    async def create_owned(self, user_id: uuid.UUID, **fields: Any) -> ModelT:
+    async def create_owned_query(self, user_id: uuid.UUID, **fields: Any) -> ModelT:
         """Create a new row, forcing `user_id` to the authenticated owner."""
         # `ModelT` is bound to the `OwnedEntity` *protocol* (for the attribute
         # access above), not to a concrete declarative class, so mypy can't see
@@ -108,10 +104,11 @@ class BaseRepository(Generic[ModelT]):
         await self.session.flush()
         return entity
 
-    async def update_owned(
+    async def update_owned_query(
         self, entity_id: uuid.UUID, user_id: uuid.UUID, **fields: Any
     ) -> ModelT | None:
-        entity = await self.get_owned(entity_id, user_id)
+        """Apply `fields` to an owned row and return it refreshed, or None if not found/owned."""
+        entity = await self.get_owned_query(entity_id, user_id)
         if entity is None:
             return None
         for key, value in fields.items():
@@ -122,12 +119,11 @@ class BaseRepository(Generic[ModelT]):
         await self.session.refresh(entity)
         return entity
 
-    async def delete_owned(self, entity_id: uuid.UUID, user_id: uuid.UUID) -> bool:
-        """Delete (or soft-delete, if the model supports it) an owned row.
-
-        Returns False if the row doesn't exist or belongs to another user.
+    async def delete_owned_query(self, entity_id: uuid.UUID, user_id: uuid.UUID) -> bool:
+        """Delete (or soft-delete, if the model supports it) an owned row; returns False if the
+        row doesn't exist or belongs to another user.
         """
-        entity = await self.get_owned(entity_id, user_id)
+        entity = await self.get_owned_query(entity_id, user_id)
         if entity is None:
             return False
         if hasattr(entity, "deleted_at"):

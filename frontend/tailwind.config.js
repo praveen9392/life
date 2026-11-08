@@ -29,6 +29,9 @@ export default {
         success: "rgb(var(--color-success) / <alpha-value>)",
         warning: "rgb(var(--color-warning) / <alpha-value>)",
         danger: "rgb(var(--color-danger) / <alpha-value>)",
+        "danger-contrast": "rgb(var(--color-danger-contrast) / <alpha-value>)",
+        "success-text": "rgb(var(--color-success-text) / <alpha-value>)",
+        "warning-text": "rgb(var(--color-warning-text) / <alpha-value>)",
       },
       fontFamily: {
         sans: ["Inter", "system-ui", "-apple-system", "Segoe UI", "sans-serif"],

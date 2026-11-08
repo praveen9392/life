@@ -4,7 +4,8 @@ import { useUIStore } from "../../stores/uiStore";
 import { AUTH_QUERY_KEY } from "../auth/hooks";
 import { profileApi, type ProfileUpdateInput } from "./api";
 
-export const SESSIONS_QUERY_KEY = ["profile", "sessions"] as const;
+// Prefixed to avoid colliding with workouts' SESSIONS_QUERY_KEY export.
+export const PROFILE_SESSIONS_QUERY_KEY = ["profile", "sessions"] as const;
 
 /**
  * Persists profile changes to the backend AND, when a theme preference is
@@ -51,7 +52,7 @@ export function useChangePassword() {
 
 export function useSessions() {
   return useQuery({
-    queryKey: SESSIONS_QUERY_KEY,
+    queryKey: PROFILE_SESSIONS_QUERY_KEY,
     queryFn: () => profileApi.listSessions(),
     staleTime: 60 * 1000,
   });
@@ -62,7 +63,7 @@ export function useRevokeSession() {
   return useMutation({
     mutationFn: (sessionId: string) => profileApi.revokeSession(sessionId),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: SESSIONS_QUERY_KEY });
+      void queryClient.invalidateQueries({ queryKey: PROFILE_SESSIONS_QUERY_KEY });
     },
   });
 }
@@ -86,7 +87,7 @@ export function useExportData() {
 export function useDeleteAccount() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => profileApi.deleteAccount(),
+    mutationFn: (input: { current_password: string }) => profileApi.deleteAccount(input),
     onSuccess: () => {
       queryClient.clear();
       window.location.href = "/login";

@@ -100,17 +100,17 @@ async def test_avatar_upload_stores_url_on_user(
     """Happy path: a valid image upload sets `avatar_url` on the user.
 
     No real S3/MinIO exists in the test environment, so the storage layer is
-    stubbed at the route's import seam (`app.api.v1.routes.users.StorageService`,
-    which the handler instantiates per request).
+    stubbed at the service's import seam (`app.services.user_service.StorageService`,
+    which `UserService.upload_avatar` instantiates per request).
     """
 
     class _StubStorage:
-        def upload_avatar(self, user_id, content, content_type, size):  # type: ignore[no-untyped-def]
+        async def upload_avatar_async(self, user_id, content, content_type, size):  # type: ignore[no-untyped-def]
             assert content_type == "image/png"
             assert size > 0
             return f"https://cdn.example.com/avatars/{user_id}/avatar.png"
 
-    monkeypatch.setattr("app.api.v1.routes.users.StorageService", _StubStorage)
+    monkeypatch.setattr("app.services.user_service.StorageService", _StubStorage)
 
     response = await api_client.post(
         "/api/v1/users/me/avatar",

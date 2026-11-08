@@ -1,0 +1,207 @@
+{
+  "results": [
+    {
+      "name": "login via UI",
+      "ok": true,
+      "note": "/app"
+    },
+    {
+      "name": "today: toggle habit updates ring + API",
+      "ok": true,
+      "note": "ring 25% -> 50%; api status=completed"
+    },
+    {
+      "name": "today: complete a task",
+      "ok": true,
+      "note": "checked after click=true"
+    },
+    {
+      "name": "quick add chooser lists 6 create actions",
+      "ok": true,
+      "note": "6 menu items"
+    },
+    {
+      "name": "task form: empty submit shows inline error (no disabled button)",
+      "ok": true,
+      "note": "create button disabled=false"
+    },
+    {
+      "name": "task form: create QA task with tag + due today",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "name": "tasks: search finds QA task",
+      "ok": true,
+      "note": "rows=1 url=/app/tasks?search=QA-task"
+    },
+    {
+      "name": "tasks: complete QA task moves it to Finished",
+      "ok": true,
+      "note": "Finished group present"
+    },
+    {
+      "name": "tasks: filter chips persist in URL + survive reload",
+      "ok": true,
+      "note": "/app/tasks?due=overdue -> pressed after reload=true"
+    },
+    {
+      "name": "tasks: delete QA task needs confirmation",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "name": "habits: create habit with reminder",
+      "ok": true,
+      "note": "listed"
+    },
+    {
+      "name": "habits: click today's cell completes (API)",
+      "ok": true,
+      "note": "logs=[\"completed\"]"
+    },
+    {
+      "name": "habits: context menu skip works",
+      "ok": true,
+      "note": "skipped state shown"
+    },
+    {
+      "name": "habits: History view renders heat strips",
+      "ok": true,
+      "note": "strips=3"
+    },
+    {
+      "name": "today: Morning tab appears for habit with reminder",
+      "ok": true,
+      "note": "Morning tab count=2"
+    },
+    {
+      "name": "habits: delete QA habit with confirmation",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "name": "notes: create note opens editor, autosaves, preview renders markdown",
+      "ok": true,
+      "note": "preview h1=Heading; url=/app/notes?note=e881fd38-fe96-48e3-a4f9-1dae802c9b91"
+    },
+    {
+      "name": "notes: create folder, move note via folder select",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "name": "notes: delete note + folder cleanup",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "name": "notes: archive warns it is irreversible, then hides the note",
+      "ok": true,
+      "note": "warning shown=1; still listed=0"
+    },
+    {
+      "name": "health: log weight, detail chart + stats, then delete",
+      "ok": true,
+      "note": "chart svgs=1"
+    },
+    {
+      "name": "workouts: log workout with a new exercise; sets show exercise name",
+      "ok": true,
+      "note": "exercise name visible in session"
+    },
+    {
+      "name": "workouts: delete QA session",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "name": "learning: log session with course, appears in Sessions tab",
+      "ok": true,
+      "note": "session rows=1"
+    },
+    {
+      "name": "learning: expand course, toggle lesson changes progress",
+      "ok": true,
+      "note": "50% of lessons complete -> 100% of lessons complete"
+    },
+    {
+      "name": "learning: add + remove library item",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "name": "goals: create manual goal, edit progress slider to 40%, delete",
+      "ok": true,
+      "note": "shows 40%=true"
+    },
+    {
+      "name": "calendar: select a day, switch to week, side panel lists tasks",
+      "ok": true,
+      "note": "panel mentions overdue task=true; url=/app/calendar?date=2026-11-05&view=week"
+    },
+    {
+      "name": "insights: month toggle",
+      "ok": true,
+      "note": "charts=1"
+    },
+    {
+      "name": "command bar: Ctrl+K opens, search shows results, Enter navigates, Esc restores focus",
+      "ok": true,
+      "note": "options=1; landed=/app/tasks?search=Overdue%3A%20renew%20passport; closed=true"
+    },
+    {
+      "name": "settings: sessions show parsed device names",
+      "ok": true,
+      "note": "Chrome on Windows | Script"
+    },
+    {
+      "name": "settings: dark theme persists to server and survives reload (UX-011)",
+      "ok": true,
+      "note": "theme after reload=dark; server pref=dark"
+    },
+    {
+      "name": "settings: header toggle also persists",
+      "ok": true,
+      "note": "theme=light; server pref=light"
+    },
+    {
+      "name": "settings: wrong current password shows inline error",
+      "ok": true,
+      "note": "Current password is incorrect"
+    },
+    {
+      "name": "settings: export downloads JSON",
+      "ok": true,
+      "note": "life-export-2026-11-08.json"
+    },
+    {
+      "name": "UX-001: expired access cookie is silently refreshed (no redirect to login)",
+      "ok": true,
+      "note": "had access cookie=true; removed=true; url=/app/tasks; task rows=3"
+    },
+    {
+      "name": "session truly gone -> redirected to /login",
+      "ok": true,
+      "note": "/login"
+    }
+  ],
+  "errors": [
+    "/login?api=http%3A%2F%2Flocalhost%3A8002 :: Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+    "/app/settings :: Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+    "/app/tasks :: Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+    "/app/habits :: Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+    "/login :: Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+  ],
+  "failed": [
+    "401 GET /api/v1/users/me",
+    "401 POST /api/v1/auth/refresh",
+    "401 POST /api/v1/users/me/password",
+    "401 GET /api/v1/tasks?page_size=50&page=1",
+    "401 GET /api/v1/tasks?due_on=2026-11-08&page_size=1",
+    "401 GET /api/v1/tasks?overdue=true&page_size=1",
+    "401 GET /api/v1/tasks?status=in_progress&page_size=1",
+    "401 GET /api/v1/tasks?status=completed&page_size=100",
+    "401 GET /api/v1/habits"
+  ]
+}

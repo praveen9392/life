@@ -8,6 +8,7 @@ import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
 import { Skeleton } from "../../../components/ui/Skeleton";
 import { cn } from "../../../utils/cn";
+import { toISODate } from "../../../utils/date";
 import type { Course, LearningItemType } from "../api";
 import {
   useAddLesson,
@@ -21,8 +22,12 @@ import {
   useUpdateLesson,
 } from "../hooks";
 
+function isLearningItemType(value: string): value is LearningItemType {
+  return value === "book" || value === "technology" || value === "topic" || value === "project";
+}
+
 function todayString(): string {
-  return new Date().toISOString().slice(0, 10);
+  return toISODate(new Date());
 }
 
 function ProgressBar({ percent }: { percent: number }) {
@@ -53,6 +58,13 @@ function CourseDetail({ courseId }: { courseId: string }) {
   const [lessonDrafts, setLessonDrafts] = useState<Record<string, string>>({});
 
   const course = courseQuery.data;
+  if (courseQuery.isError) {
+    return (
+      <p role="alert" className="mt-3 border-t border-border pt-3 text-sm text-danger">
+        Unable to load course details. Please try again later.
+      </p>
+    );
+  }
   if (!course) return null;
 
   return (
@@ -79,7 +91,7 @@ function CourseDetail({ courseId }: { courseId: string }) {
                       }
                       aria-label={`Toggle lesson "${lesson.title}"`}
                       aria-pressed={done}
-                      className="text-text-muted hover:text-accent disabled:opacity-50"
+                      className="inline-flex h-6 w-6 items-center justify-center text-text-muted hover:text-accent disabled:opacity-50"
                     >
                       {done ? (
                         <CheckCircle2 className="h-4 w-4 text-accent" aria-hidden />
@@ -284,19 +296,22 @@ export default function LearningPage() {
         <QueryStateBoundary
           query={coursesQuery}
           skeleton={<Skeleton className="h-24 w-full" />}
-          empty={<EmptyState title="No courses" icon={<BookOpen className="h-8 w-8" aria-hidden />} />}
-        >
-          {(courses) =>
-            courses.length === 0 ? (
-              <EmptyState title="No courses" description="Add a course to track structured learning." />
-            ) : (
-              <ul className="space-y-3" aria-label="Courses">
-                {courses.map((course) => (
-                  <CourseCard key={course.id} course={course} />
-                ))}
-              </ul>
-            )
+          isEmpty={(courses) => courses.length === 0}
+          empty={
+            <EmptyState
+              icon={<BookOpen className="h-8 w-8" aria-hidden />}
+              title="No courses"
+              description="Add a course to track structured learning."
+            />
           }
+        >
+          {(courses) => (
+            <ul className="space-y-3" aria-label="Courses">
+              {courses.map((course) => (
+                <CourseCard key={course.id} course={course} />
+              ))}
+            </ul>
+          )}
         </QueryStateBoundary>
       </section>
 
@@ -308,7 +323,9 @@ export default function LearningPage() {
             className="input w-32"
             aria-label="Item type"
             value={itemType}
-            onChange={(event) => setItemType(event.target.value as LearningItemType)}
+            onChange={(event) => {
+              if (isLearningItemType(event.target.value)) setItemType(event.target.value);
+            }}
           >
             <option value="book">Book</option>
             <option value="technology">Technology</option>
@@ -330,27 +347,24 @@ export default function LearningPage() {
         <QueryStateBoundary
           query={itemsQuery}
           skeleton={<Skeleton className="h-16 w-full" />}
-          empty={<EmptyState title="No items" />}
+          isEmpty={(items) => items.length === 0}
+          empty={<EmptyState title="No items" description="Track books, technologies, topics, projects." />}
         >
-          {(items) =>
-            items.length === 0 ? (
-              <EmptyState title="No items" description="Track books, technologies, topics, projects." />
-            ) : (
-              <ul className="space-y-1.5" aria-label="Learning items">
-                {items.map((item) => (
-                  <li
-                    key={item.id}
-                    className="flex items-center justify-between rounded-lg border border-border bg-surface px-3 py-2"
-                  >
-                    <span className="text-sm font-medium text-text">{item.title}</span>
-                    <span className="text-xs text-text-muted">
-                      {item.type} · {item.status.replace("_", " ")} · {item.progress_percent}%
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )
-          }
+          {(items) => (
+            <ul className="space-y-1.5" aria-label="Learning items">
+              {items.map((item) => (
+                <li
+                  key={item.id}
+                  className="flex items-center justify-between rounded-lg border border-border bg-surface px-3 py-2"
+                >
+                  <span className="text-sm font-medium text-text">{item.title}</span>
+                  <span className="text-xs text-text-muted">
+                    {item.type} · {item.status.replace("_", " ")} · {item.progress_percent}%
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
         </QueryStateBoundary>
       </section>
     </div>

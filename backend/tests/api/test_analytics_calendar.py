@@ -58,6 +58,32 @@ async def test_analytics_summary_matches_seeded_data(api_client: AsyncClient, us
     assert body["habits"][0]["rate_percent"] == 100
 
 
+async def test_analytics_streak_spans_beyond_the_selected_period(api_client: AsyncClient, user_a) -> None:  # type: ignore[no-untyped-def]
+    today = datetime.now(UTC).date()
+    streak_days = 20
+    habit = (
+        await api_client.post(
+            "/api/v1/habits",
+            json={
+                "name": "Long streak",
+                "frequency_type": "daily",
+                "start_date": (today - timedelta(days=40)).isoformat(),
+            },
+            headers=csrf_headers(api_client),
+        )
+    ).json()
+    for offset in range(streak_days):
+        await api_client.put(
+            f"/api/v1/habits/{habit['id']}/log/{(today - timedelta(days=offset)).isoformat()}",
+            json={"status": "completed"},
+            headers=csrf_headers(api_client),
+        )
+
+    week = (await api_client.get("/api/v1/analytics/summary?period=week")).json()
+    assert week["best_current_streak"] == streak_days
+    assert week["habits"][0]["current_streak"] == streak_days
+
+
 async def test_analytics_rejects_bad_period(api_client: AsyncClient, user_a) -> None:  # type: ignore[no-untyped-def]
     response = await api_client.get("/api/v1/analytics/summary?period=century")
     assert response.status_code == 422

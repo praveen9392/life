@@ -18,19 +18,41 @@ export function useHabits() {
   });
 }
 
-export function useHabitStreak(habitId: string) {
-  return useQuery({
-    queryKey: ["habits", habitId, "streak"],
+/**
+ * Query options for a single habit's streak. Exported so callers can fan
+ * out to `useQueries` for a dynamic list of habits while sharing the same
+ * queryKey/queryFn (and therefore the cache) as `useHabitStreak`.
+ */
+export function habitStreakQueryOptions(habitId: string) {
+  return {
+    queryKey: ["habits", habitId, "streak"] as const,
     queryFn: () => habitsApi.streak(habitId),
     staleTime: 30 * 1000,
+  };
+}
+
+/** Query options for a single habit's history; see `habitStreakQueryOptions`. */
+export function habitHistoryQueryOptions(habitId: string, days = 30) {
+  return {
+    queryKey: ["habits", habitId, "history", days] as const,
+    queryFn: () => habitsApi.history(habitId, days),
+    staleTime: 30 * 1000,
+  };
+}
+
+export function useHabitStreak(habitId: string, options?: { enabled?: boolean }) {
+  return useQuery({
+    ...habitStreakQueryOptions(habitId),
+    // Never fire `GET /habits//streak` for a missing id.
+    enabled: options?.enabled !== false && !!habitId,
   });
 }
 
-export function useHabitHistory(habitId: string, days = 30) {
+export function useHabitHistory(habitId: string, days = 30, options?: { enabled?: boolean }) {
   return useQuery({
-    queryKey: ["habits", habitId, "history", days],
-    queryFn: () => habitsApi.history(habitId, days),
-    staleTime: 30 * 1000,
+    ...habitHistoryQueryOptions(habitId, days),
+    // Never fire `GET /habits//history` for a missing id.
+    enabled: options?.enabled !== false && !!habitId,
   });
 }
 
@@ -82,6 +104,18 @@ export function useLogHabit() {
       note?: string;
     }) => habitsApi.log(habitId, logDate, status, note),
     onSuccess: (_log, variables) => {
+      void queryClient.invalidateQueries({ queryKey: ["habits", variables.habitId] });
+      void queryClient.invalidateQueries({ queryKey: DASHBOARD_QUERY_KEY });
+    },
+  });
+}
+
+export function useUnlogHabit() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ habitId, logDate }: { habitId: string; logDate: string }) =>
+      habitsApi.removeLog(habitId, logDate),
+    onSuccess: (_result, variables) => {
       void queryClient.invalidateQueries({ queryKey: ["habits", variables.habitId] });
       void queryClient.invalidateQueries({ queryKey: DASHBOARD_QUERY_KEY });
     },

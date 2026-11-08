@@ -8,14 +8,20 @@ once a session exists (i.e. an access-token cookie is present) - there is
 nothing to forge before a user is authenticated.
 """
 
+import re
 import uuid
 from collections.abc import Awaitable, Callable
 
+from starlette.datastructures import Headers
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from app.core.config import get_settings
+from app.core.logging import request_id_ctx
+
+_REQUEST_ID_PATTERN = re.compile(r"[A-Za-z0-9-]{8,64}")
 
 _SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 
@@ -36,11 +42,36 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
     """Attach a unique `X-Request-ID` to every request/response for log correlation."""
 
     async def dispatch(self, request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
-        request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
+        inbound = request.headers.get("X-Request-ID", "")
+        request_id = inbound if _REQUEST_ID_PATTERN.fullmatch(inbound) else str(uuid.uuid4())
         request.state.request_id = request_id
-        response = await call_next(request)
+        token = request_id_ctx.set(request_id)
+        try:
+            response = await call_next(request)
+        finally:
+            request_id_ctx.reset(token)
         response.headers["X-Request-ID"] = request_id
         return response
+
+
+class BodySizeLimitMiddleware:
+    """Reject requests whose declared Content-Length exceeds the configured limit."""
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] == "http":
+            declared = Headers(scope=scope).get("content-length")
+            limit = get_settings().max_request_body_bytes
+            if declared is not None and declared.isdigit() and int(declared) > limit:
+                response = JSONResponse(
+                    status_code=413,
+                    content={"error": {"code": "PAYLOAD_TOO_LARGE", "message": "Request body too large"}},
+                )
+                await response(scope, receive, send)
+                return
+        await self.app(scope, receive, send)
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):

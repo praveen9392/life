@@ -20,7 +20,7 @@ export class ApiError extends Error {
 }
 
 // Override with VITE_API_BASE_URL in .env.local (gitignored) for other setups.
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8001";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
 
 interface RequestOptions {
   method?: "GET" | "POST" | "PATCH" | "DELETE" | "PUT";
@@ -31,6 +31,16 @@ interface RequestOptions {
 function getCookie(name: string): string | null {
   const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
   return match ? decodeURIComponent(match[1]) : null;
+}
+
+const AUTH_PATH_FRAGMENT = "/auth/";
+const PUBLIC_PAGE_PATHS = ["/login", "/register"];
+
+// A full navigation also discards the in-memory query cache (including ['auth','me']).
+function redirectToLoginIfSessionExpired(requestPath: string): void {
+  if (requestPath.includes(AUTH_PATH_FRAGMENT)) return;
+  if (PUBLIC_PAGE_PATHS.includes(window.location.pathname)) return;
+  window.location.assign("/login");
 }
 
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
@@ -75,6 +85,9 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     | null;
 
   if (!response.ok) {
+    if (response.status === 401) {
+      redirectToLoginIfSessionExpired(path);
+    }
     const errorPayload = data?.error;
     throw new ApiError(
       response.status,

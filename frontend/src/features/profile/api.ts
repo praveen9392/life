@@ -1,4 +1,4 @@
-import { httpClient } from "../../services/api/httpClient";
+import { httpClient, request } from "../../services/api/httpClient";
 import type { NotificationPreferences, Session, ThemePreference, User } from "../../types/user";
 
 export interface ProfileUpdateInput {
@@ -17,5 +17,7 @@ export const profileApi = {
   revokeSession: (sessionId: string) =>
     httpClient.delete<{ message: string }>(`/api/v1/users/me/sessions/${sessionId}`),
   exportData: () => httpClient.get<Record<string, unknown>>("/api/v1/privacy/export"),
-  deleteAccount: () => httpClient.delete("/api/v1/privacy/account"),
+  // DELETE with a JSON body (re-auth required) — httpClient.delete sends no body.
+  deleteAccount: (input: { current_password: string }) =>
+    request<void>("/api/v1/privacy/account", { method: "DELETE", body: input }),
 };

@@ -1,0 +1,221 @@
+{
+  "today": "2026-11-08",
+  "habits_completed_today": 2,
+  "habits_due_today": 4,
+  "tasks_completed_today": 1,
+  "tasks_due_today": 3,
+  "daily_progress_percent": 42,
+  "habits": [
+    {
+      "habit": {
+        "id": "529c304a-7945-4121-b1ed-14a1f7d37b31",
+        "name": "An extremely long habit name that should truncate gracefully in charts and lists on narrow screens",
+        "description": null,
+        "category": "health",
+        "icon": null,
+        "color": null,
+        "frequency_type": "daily",
+        "frequency_config": {},
+        "target_count": 1,
+        "start_date": "2026-10-09",
+        "end_date": null,
+        "reminder_time": null,
+        "is_active": true,
+        "created_at": "2026-11-08T13:56:43.331870Z",
+        "updated_at": "2026-11-08T13:56:43.331870Z"
+      },
+      "is_due": true,
+      "status": null
+    },
+    {
+      "habit": {
+        "id": "7839ed68-0903-4c0d-9808-55641f924f15",
+        "name": "Cold plunge",
+        "description": null,
+        "category": "health",
+        "icon": null,
+        "color": null,
+        "frequency_type": "daily",
+        "frequency_config": {},
+        "target_count": 1,
+        "start_date": "2026-10-09",
+        "end_date": null,
+        "reminder_time": null,
+        "is_active": true,
+        "created_at": "2026-11-08T13:56:43.318843Z",
+        "updated_at": "2026-11-08T13:56:43.318843Z"
+      },
+      "is_due": true,
+      "status": null
+    },
+    {
+      "habit": {
+        "id": "486b7fb7-9a47-42ed-bce3-f3527f7231e6",
+        "name": "Meditate",
+        "description": null,
+        "category": "health",
+        "icon": null,
+        "color": null,
+        "frequency_type": "daily",
+        "frequency_config": {},
+        "target_count": 1,
+        "start_date": "2026-11-08",
+        "end_date": null,
+        "reminder_time": "07:30:00",
+        "is_active": true,
+        "created_at": "2026-11-08T13:56:43.303064Z",
+        "updated_at": "2026-11-08T13:56:43.303064Z"
+      },
+      "is_due": true,
+      "status": "completed"
+    },
+    {
+      "habit": {
+        "id": "fbf71071-1da7-48b3-aa2b-0fee423839a1",
+        "name": "Gym",
+        "description": null,
+        "category": "health",
+        "icon": null,
+        "color": null,
+        "frequency_type": "weekly",
+        "frequency_config": {
+          "weekdays": [
+            0,
+            2,
+            4
+          ]
+        },
+        "target_count": 1,
+        "start_date": "2026-10-09",
+        "end_date": null,
+        "reminder_time": null,
+        "is_active": true,
+        "created_at": "2026-11-08T13:56:43.287734Z",
+        "updated_at": "2026-11-08T13:56:43.287734Z"
+      },
+      "is_due": false,
+      "status": null
+    },
+    {
+      "habit": {
+        "id": "a758032b-580c-4c4f-b76a-c252f5be1b33",
+        "name": "Read 20 pages",
+        "description": null,
+        "category": "health",
+        "icon": null,
+        "color": null,
+        "frequency_type": "daily",
+        "frequency_config": {},
+        "target_count": 1,
+        "start_date": "2026-10-09",
+        "end_date": null,
+        "reminder_time": null,
+        "is_active": true,
+        "created_at": "2026-11-08T13:56:43.265624Z",
+        "updated_at": "2026-11-08T13:56:43.265624Z"
+      },
+      "is_due": true,
+      "status": "completed"
+    }
+  ],
+  "tasks_today": [
+    {
+      "id": "aa138a96-ec50-4f45-bd08-6a04efe603c0",
+      "title": "Water the plants",
+      "description": null,
+      "priority": "medium",
+      "status": "pending",
+      "list": "today",
+      "due_date": "2026-11-08",
+      "due_time": null,
+      "estimated_duration_minutes": null,
+      "is_recurring_template": false,
+      "recurrence_rule": null,
+      "recurrence_template_id": "dccaa914-94c9-4404-b7dc-921db3c73a3e",
+      "completed_at": null,
+      "tags": [],
+      "created_at": "2026-11-08T13:56:44.219267Z",
+      "updated_at": "2026-11-08T13:56:44.219267Z"
+    },
+    {
+      "id": "613fecb9-f34f-4fd1-bf7f-277915f7fe24",
+      "title": "Email the team",
+      "description": null,
+      "priority": "medium",
+      "status": "pending",
+      "list": "today",
+      "due_date": "2026-11-08",
+      "due_time": null,
+      "estimated_duration_minutes": null,
+      "is_recurring_template": false,
+      "recurrence_rule": null,
+      "recurrence_template_id": null,
+      "completed_at": null,
+      "tags": [],
+      "created_at": "2026-11-08T13:56:44.163270Z",
+      "updated_at": "2026-11-08T13:56:44.163270Z"
+    },
+    {
+      "id": "32187135-6c46-4551-842c-c5934d86f75e",
+      "title": "Ship quarterly report",
+      "description": null,
+      "priority": "high",
+      "status": "completed",
+      "list": "today",
+      "due_date": "2026-11-08",
+      "due_time": "16:00:00",
+      "estimated_duration_minutes": null,
+      "is_recurring_template": false,
+      "recurrence_rule": null,
+      "recurrence_template_id": null,
+      "completed_at": "2026-11-08T13:56:44.239140Z",
+      "tags": [],
+      "created_at": "2026-11-08T13:56:44.147456Z",
+      "updated_at": "2026-11-08T13:56:44.235702Z"
+    }
+  ],
+  "tasks_upcoming": [
+    {
+      "id": "a0c0e480-e0f3-42b0-8d34-4508c8419094",
+      "title": "Plan next week",
+      "description": null,
+      "priority": "low",
+      "status": "pending",
+      "list": "upcoming",
+      "due_date": "2026-11-11",
+      "due_time": null,
+      "estimated_duration_minutes": null,
+      "is_recurring_template": false,
+      "recurrence_rule": null,
+      "recurrence_template_id": null,
+      "completed_at": null,
+      "tags": [],
+      "created_at": "2026-11-08T13:56:44.204393Z",
+      "updated_at": "2026-11-08T13:56:44.204393Z"
+    }
+  ],
+  "tasks_overdue": [
+    {
+      "id": "15cf3564-77df-43d0-9054-c9adf0422ed6",
+      "title": "Overdue: renew passport",
+      "description": null,
+      "priority": "urgent",
+      "status": "pending",
+      "list": "today",
+      "due_date": "2026-11-05",
+      "due_time": null,
+      "estimated_duration_minutes": null,
+      "is_recurring_template": false,
+      "recurrence_rule": null,
+      "recurrence_template_id": null,
+      "completed_at": null,
+      "tags": [],
+      "created_at": "2026-11-08T13:56:44.177753Z",
+      "updated_at": "2026-11-08T13:56:44.177753Z"
+    }
+  ],
+  "recent_notes_count": 3,
+  "learning_minutes_this_week": 135,
+  "workout_sessions_this_week": 3,
+  "best_current_streak": 14
+}

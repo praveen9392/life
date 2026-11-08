@@ -33,8 +33,6 @@ export const goalsApi = {
     target_date?: string;
     progress_mode?: GoalProgressMode;
   }) => httpClient.post<Goal>("/api/v1/goals", input),
-  update: (goalId: string, input: Partial<Goal>) =>
-    httpClient.patch<Goal>(`/api/v1/goals/${goalId}`, input),
   remove: (goalId: string) => httpClient.delete(`/api/v1/goals/${goalId}`),
   addMilestone: (goalId: string, title: string) =>
     httpClient.post<Milestone>(`/api/v1/goals/${goalId}/milestones`, { title }),

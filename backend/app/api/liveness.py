@@ -7,16 +7,17 @@ liveness probe) needs a route that never requires auth and never 404s, so
 it is mounted unversioned at `/health` and `/health/db`.
 """
 
+import asyncio
+
 from fastapi import APIRouter, status
 from sqlalchemy import text
 
 from app.api.deps import DbSession
 from app.core.exceptions import AppException
-from app.core.logging import get_logger
-
-logger = get_logger(__name__)
+from app.core.logging import logger
 
 router = APIRouter(tags=["liveness"])
+_DB_PROBE_TIMEOUT_SECONDS = 3
 
 
 class DatabaseUnavailableError(AppException):
@@ -43,8 +44,8 @@ async def get_database_connectivity(db: DbSession) -> dict[str, str]:
         DatabaseUnavailableError: with a 503 status if the database is unreachable.
     """
     try:
-        await db.execute(text("SELECT 1"))
+        await asyncio.wait_for(db.execute(text("SELECT 1")), timeout=_DB_PROBE_TIMEOUT_SECONDS)
     except Exception as exc:
-        logger.error("liveness_db_check_failed", error=str(exc))
+        logger.error(f"liveness_db_check_failed | error_type={type(exc).__name__}")
         raise DatabaseUnavailableError("Database connectivity check failed") from exc
     return {"status": "ok", "database": "connected"}

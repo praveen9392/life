@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "period must be one of: month, week",
+    "request_id": "73ea98c1-d5ea-49e7-a873-3294d2224591"
+  }
+}

@@ -6,6 +6,9 @@ versioned API router. `/docs` is only exposed outside production (see
 `Settings.docs_enabled`).
 """
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -16,19 +19,34 @@ from app.api import liveness
 from app.api.router import v1_router
 from app.core.config import get_settings
 from app.core.exceptions import register_exception_handlers
-from app.core.logging import configure_logging, get_logger
-from app.core.middleware import CSRFMiddleware, RequestIDMiddleware, SecurityHeadersMiddleware
+from app.core.logging import configure_logging, logger
+from app.core.middleware import (
+    BodySizeLimitMiddleware,
+    CSRFMiddleware,
+    RequestIDMiddleware,
+    SecurityHeadersMiddleware,
+)
 from app.core.rate_limit import limiter
+from app.db.session import engine
 
-logger = get_logger(__name__)
+
+@asynccontextmanager
+async def _lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    yield
+    logger.info("Shutdown: disposing database engine")
+    await engine.dispose()
+    logger.info("Shutdown complete")
 
 
 def create_app() -> FastAPI:
     settings = get_settings()
     settings.validate_production_secrets()
-    configure_logging()
+    configure_logging(settings)
+    logger.info("Startup: configuration validated")
+    logger.debug("Logging configured")
 
     app = FastAPI(
+        lifespan=_lifespan,
         title=settings.app_name,
         docs_url="/docs" if settings.docs_enabled else None,
         redoc_url="/redoc" if settings.docs_enabled else None,
@@ -53,13 +71,18 @@ def create_app() -> FastAPI:
     app.add_middleware(CSRFMiddleware)
     app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(RequestIDMiddleware)
+    app.add_middleware(BodySizeLimitMiddleware)
+    logger.debug("Middleware registered")
 
     register_exception_handlers(app)
 
     app.include_router(liveness.router)  # unversioned: GET /health, /health/db
     app.include_router(v1_router)
 
-    logger.info("app_startup", environment=settings.environment.value)
+    feature_router_count = 16
+    logger.info(f"Startup: API routers mounted ({feature_router_count} feature routers)")
+
+    logger.info(f"app_startup | environment={settings.environment.value}")
     return app
 
 

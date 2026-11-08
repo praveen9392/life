@@ -14,7 +14,7 @@ from app.utils.enums import HealthMetricType
 class HealthRepository(BaseRepository[HealthMetric]):
     model = HealthMetric
 
-    async def list_for_user(
+    async def list_for_user_query(
         self,
         user_id: uuid.UUID,
         *,
@@ -24,6 +24,9 @@ class HealthRepository(BaseRepository[HealthMetric]):
         offset: int = 0,
         limit: int = 50,
     ) -> tuple[list[HealthMetric], int]:
+        """Return (page, total) of the user's health metrics, newest first, optionally filtered
+        by metric type and a user-local calendar day.
+        """
         query = self._base_query(user_id)
         if metric_type is not None:
             query = query.where(HealthMetric.metric_type == metric_type)

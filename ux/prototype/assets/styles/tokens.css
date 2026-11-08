@@ -1,0 +1,100 @@
+/* Design tokens - "Paper & Ink, Evergreen accent". Light and dark are paired role-for-role. */
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f6f3ec;
+  --surface: #ffffff;
+  --surface-2: #fbf9f4;
+  --line: #e6e1d5;
+  --line-strong: #d3ccbc;
+  --ink: #1c1b17;
+  --ink-2: #5a5649;
+  --ink-3: #6f6a5d;
+  --accent: #2f6b57;
+  --accent-hover: #265a49;
+  --accent-ink: #ffffff;
+  --accent-soft: #e3f0ea;
+  --warn: #b45309;
+  --warn-soft: #fbebd3;
+  --danger: #b3362d;
+  --danger-soft: #f8e1de;
+  --info-soft: #e6edf7;
+  --scrim: rgba(28, 27, 23, 0.45);
+  --shadow-pop: 0 12px 32px rgba(28, 27, 23, 0.16), 0 2px 6px rgba(28, 27, 23, 0.08);
+
+  --m-today: #2f6b57;
+  --m-tasks: #3b6fb6;
+  --m-habits: #2f8a5b;
+  --m-notes: #7a5bb5;
+  --m-health: #c2476b;
+  --m-workouts: #c96a1b;
+  --m-learning: #1e8c93;
+  --m-goals: #a47c0c;
+  --m-calendar: #5e6b7a;
+  --m-insights: #5e6b7a;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #14130f;
+  --surface: #1c1b16;
+  --surface-2: #22211b;
+  --line: #2e2c25;
+  --line-strong: #3d3a31;
+  --ink: #efebe0;
+  --ink-2: #b0aa9a;
+  --ink-3: #928c7b;
+  --accent: #6fc3a4;
+  --accent-hover: #86d0b4;
+  --accent-ink: #0e1a15;
+  --accent-soft: #1e2f28;
+  --warn: #f0b05a;
+  --warn-soft: #34281a;
+  --danger: #ef8a80;
+  --danger-soft: #36201e;
+  --info-soft: #1d2735;
+  --scrim: rgba(0, 0, 0, 0.6);
+  --shadow-pop: 0 12px 32px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.4);
+
+  --m-today: #6fc3a4;
+  --m-tasks: #7ba6e6;
+  --m-habits: #5fc990;
+  --m-notes: #b49be0;
+  --m-health: #ee8aa8;
+  --m-workouts: #eba15f;
+  --m-learning: #5fc9cf;
+  --m-goals: #e0bb4d;
+  --m-calendar: #9aa7b6;
+  --m-insights: #9aa7b6;
+}
+
+:root {
+  --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --font-display: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 20px;
+  --s-6: 24px;
+  --s-8: 32px;
+  --s-12: 48px;
+  --s-16: 64px;
+
+  --r-sm: 6px;
+  --r-md: 8px;
+  --r-lg: 12px;
+  --r-pill: 999px;
+
+  --t-fast: 120ms;
+  --t-ui: 200ms;
+  --t-sheet: 320ms;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  --sidebar-w: 248px;
+  --sidebar-w-collapsed: 72px;
+  --topbar-h: 60px;
+  --tabbar-h: 64px;
+}

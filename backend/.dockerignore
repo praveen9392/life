@@ -6,3 +6,6 @@ __pycache__/
 tests/
 .env
 *.md
+
+*.log
+logs/

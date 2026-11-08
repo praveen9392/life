@@ -16,7 +16,10 @@ from app.api.v1.routes import (
     habits,
     health,
     learning,
+    note_directories,
     notes,
+    notifications,
+    privacy,
     search,
     tags,
     tasks,
@@ -30,6 +33,7 @@ v1_router.include_router(users.router)
 v1_router.include_router(tasks.router)
 v1_router.include_router(habits.router)
 v1_router.include_router(notes.router)
+v1_router.include_router(note_directories.router)
 v1_router.include_router(dashboard.router)
 v1_router.include_router(health.router)
 v1_router.include_router(workouts.router)
@@ -37,6 +41,8 @@ v1_router.include_router(learning.router)
 v1_router.include_router(goals.router)
 v1_router.include_router(analytics.router)
 v1_router.include_router(search.router)
+v1_router.include_router(notifications.router)
+v1_router.include_router(privacy.router)
 v1_router.include_router(tags.router)
 
 # Feature routers are added here as each phase implements them.

@@ -19,6 +19,7 @@ from argon2.exceptions import VerifyMismatchError
 
 from app.core.config import get_settings
 from app.core.exceptions import UnauthorizedError
+from app.core.logging import logger
 
 _password_hasher = PasswordHasher()
 
@@ -38,6 +39,17 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         return _password_hasher.verify(hashed_password, plain_password)
     except VerifyMismatchError:
         return False
+
+
+_dummy_hash: str | None = None
+
+
+def verify_password_dummy(plain_password: str) -> None:
+    """Run a throwaway Argon2 verify so unknown-email logins cost the same time."""
+    global _dummy_hash
+    if _dummy_hash is None:
+        _dummy_hash = _password_hasher.hash("dummy-password-for-timing")
+    verify_password(plain_password, _dummy_hash)
 
 
 def create_access_token(user_id: uuid.UUID) -> str:
@@ -62,15 +74,19 @@ def decode_access_token(token: str) -> uuid.UUID:
     try:
         payload = jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
     except jwt.ExpiredSignatureError as exc:
+        logger.warning("Expired access token")
         raise UnauthorizedError("Session expired, please log in again") from exc
     except jwt.InvalidTokenError as exc:
+        logger.warning("Invalid access token")
         raise UnauthorizedError("Invalid session token") from exc
 
     if payload.get(TOKEN_TYPE_CLAIM) != ACCESS_TOKEN_TYPE:
+        logger.warning("Access token with wrong type claim")
         raise UnauthorizedError("Invalid session token")
     try:
         return uuid.UUID(payload[SUB_CLAIM])
     except (KeyError, ValueError) as exc:
+        logger.warning("Access token missing or invalid subject claim")
         raise UnauthorizedError("Invalid session token") from exc
 
 

@@ -13,7 +13,7 @@ notifications on top.
 | Backend   | FastAPI (Python 3.11), SQLAlchemy async ORM, Alembic migrations, Pydantic v2 |
 | Database  | PostgreSQL 16+ (`pgcrypto`) |
 | Auth      | JWT access + opaque rotating refresh tokens in httpOnly cookies, double-submit CSRF |
-| Storage   | S3-compatible object storage for avatars (planned) |
+| Storage   | S3-compatible object storage for avatars (implemented; optional, 503 if unconfigured) |
 
 ## Quickstart
 
@@ -26,12 +26,12 @@ python -m venv .venv && .venv\Scripts\activate   # Windows
 pip install -r requirements-dev.txt
 cp .env.example .env                             # fill in DATABASE_URL + JWT_SECRET_KEY
 python -m alembic upgrade head
-uvicorn app.main:app --reload --port 8001        # http://localhost:8001
+uvicorn app.main:app --reload --port 8000        # http://localhost:8000
 
 # Frontend (new terminal)
 cd frontend
 npm ci
-npm run dev                                      # http://localhost:5174
+npm run dev                                      # http://localhost:5173
 ```
 
 Or with Docker (full stack incl. Postgres):
@@ -54,7 +54,7 @@ cd frontend
 npm run lint
 npm run test        # Vitest component/unit tests
 npm run build       # tsc --noEmit + vite build
-npm run test:e2e    # Playwright (needs backend running on :8001)
+npm run test:e2e    # Playwright (needs test backend running on :8000)
 ```
 
 Liveness probes: `GET /health` (no auth, no DB) and `GET /health/db`

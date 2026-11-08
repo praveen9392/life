@@ -1,0 +1,57 @@
+{
+  "period": "week",
+  "start_date": "2026-10-05",
+  "end_date": "2026-10-10",
+  "habit_completion_percent": 88,
+  "habits": [
+    {
+      "habit_id": "33e0e28c-91cc-47c6-b0d8-2bf88e915993",
+      "name": "An extremely long habit name that should truncate gracefully in charts and lists on narrow screens",
+      "completed": 5,
+      "expected": 6,
+      "rate_percent": 83,
+      "current_streak": 5
+    },
+    {
+      "habit_id": "4152e2b4-e93d-46a3-8a03-77cfeb976dd6",
+      "name": "Cold plunge",
+      "completed": 0,
+      "expected": 6,
+      "rate_percent": 0,
+      "current_streak": 0
+    },
+    {
+      "habit_id": "2bb2db47-ddda-4210-b8f6-459683bbb05b",
+      "name": "Meditate",
+      "completed": 1,
+      "expected": 1,
+      "rate_percent": 100,
+      "current_streak": 1
+    },
+    {
+      "habit_id": "2c68598c-a3a3-4f89-894b-110cdd0bcead",
+      "name": "Gym",
+      "completed": 3,
+      "expected": 3,
+      "rate_percent": 100,
+      "current_streak": 14
+    },
+    {
+      "habit_id": "88ea3f11-0985-4065-a58d-e296d1d2de7e",
+      "name": "Read 20 pages",
+      "completed": 6,
+      "expected": 6,
+      "rate_percent": 100,
+      "current_streak": 8
+    }
+  ],
+  "tasks_due": 4,
+  "tasks_completed": 2,
+  "task_completion_percent": 50,
+  "learning_minutes": 0,
+  "learning_sessions": 0,
+  "workout_sessions": 0,
+  "goals_active": 0,
+  "goals_average_progress": 0,
+  "best_current_streak": 14
+}

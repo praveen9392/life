@@ -11,6 +11,7 @@ from app.models.tag import TaskTag
 from app.models.task import Task
 from app.repositories.base import BaseRepository
 from app.utils.enums import TaskList, TaskPriority, TaskStatus
+from app.utils.sql import escape_like
 
 TaskSortField = Literal["due_date", "created_at", "priority"]
 SortOrder = Literal["asc", "desc"]
@@ -48,7 +49,7 @@ class TaskRepository(BaseRepository[Task]):
         column = Task.created_at.desc() if descending else Task.created_at.asc()
         return (column,)
 
-    async def list_for_user(
+    async def list_for_user_query(
         self,
         user_id: uuid.UUID,
         *,
@@ -65,6 +66,9 @@ class TaskRepository(BaseRepository[Task]):
         sort: TaskSortField | None = None,
         order: SortOrder = "desc",
     ) -> tuple[list[Task], int]:
+        """Return (page, total) of the user's non-template tasks with tags, filtered by
+        status/list/priority/search/due-date windows and sorted per `sort`/`order`.
+        """
         query = self._base_query(user_id)
         if status is not None:
             query = query.where(Task.status == status)
@@ -73,8 +77,13 @@ class TaskRepository(BaseRepository[Task]):
         if priority is not None:
             query = query.where(Task.priority == priority)
         if search:
-            pattern = f"%{search}%"
-            query = query.where(or_(Task.title.ilike(pattern), Task.description.ilike(pattern)))
+            pattern = f"%{escape_like(search)}%"
+            query = query.where(
+                or_(
+                    Task.title.ilike(pattern, escape="\\"),
+                    Task.description.ilike(pattern, escape="\\"),
+                )
+            )
         if overdue_before is not None:
             # "Overdue" is derived, not a stored status: unfinished work whose
             # due date has passed (the caller passes the user-local today).
@@ -99,14 +108,15 @@ class TaskRepository(BaseRepository[Task]):
         rows = (await self.session.execute(query.offset(offset).limit(limit))).scalars().all()
         return list(rows), total
 
-    async def set_tags(self, task_id: uuid.UUID, tag_ids: list[uuid.UUID]) -> None:
+    async def set_tags_query(self, task_id: uuid.UUID, tag_ids: list[uuid.UUID]) -> None:
         """Replace a task's tag associations with exactly `tag_ids`."""
         await self.session.execute(delete(TaskTag).where(TaskTag.task_id == task_id))
         for tag_id in tag_ids:
             self.session.add(TaskTag(task_id=task_id, tag_id=tag_id))
         await self.session.flush()
 
-    async def list_overdue(self, user_id: uuid.UUID, today: date, *, limit: int = 20) -> list[Task]:
+    async def list_overdue_query(self, user_id: uuid.UUID, today: date, *, limit: int = 20) -> list[Task]:
+        """List the user's unfinished tasks due before `today`, oldest due first."""
         query = (
             self._base_query(user_id)
             .where(
@@ -117,9 +127,12 @@ class TaskRepository(BaseRepository[Task]):
             .order_by(Task.due_date)
             .limit(limit)
         )
-        return list((await self.session.execute(query)).scalars().all())
+        query_result = await self.session.execute(query)
+        matching_records = query_result.scalars().all()
+        return list(matching_records)
 
-    async def get_template(self, template_id: uuid.UUID, user_id: uuid.UUID) -> Task | None:
+    async def get_template_query(self, template_id: uuid.UUID, user_id: uuid.UUID) -> Task | None:
+        """Fetch an owned, non-deleted recurring-task template by ID (with tags)."""
         query = (
             select(Task)
             .where(
@@ -130,9 +143,12 @@ class TaskRepository(BaseRepository[Task]):
             )
             .options(selectinload(Task.tags))
         )
-        return (await self.session.execute(query)).scalar_one_or_none()
+        query_result = await self.session.execute(query)
+        matching_record = query_result.scalar_one_or_none()
+        return matching_record
 
-    async def find_active_occurrence(self, template_id: uuid.UUID, user_id: uuid.UUID) -> Task | None:
+    async def find_active_occurrence_query(self, template_id: uuid.UUID, user_id: uuid.UUID) -> Task | None:
+        """Fetch the user's live (pending/in-progress) occurrence generated from a template."""
         query = (
             self._base_query(user_id)
             .where(
@@ -141,11 +157,14 @@ class TaskRepository(BaseRepository[Task]):
             )
             .limit(1)
         )
-        return (await self.session.execute(query)).scalar_one_or_none()
+        query_result = await self.session.execute(query)
+        matching_record = query_result.scalar_one_or_none()
+        return matching_record
 
-    async def count_completed_between(
+    async def count_completed_between_query(
         self, user_id: uuid.UUID, start: date, end: date
     ) -> int:
+        """Count completed non-template tasks due within [start, end] (completion-rate numerator)."""
         from sqlalchemy import func
 
         # Completed-today is computed from completed_at's user-local date in the
@@ -161,9 +180,12 @@ class TaskRepository(BaseRepository[Task]):
             Task.due_date >= start,
             Task.due_date <= end,
         )
-        return (await self.session.execute(query)).scalar_one()
+        query_result = await self.session.execute(query)
+        scalar_value = query_result.scalar_one()
+        return scalar_value
 
-    async def count_due_between(self, user_id: uuid.UUID, start: date, end: date) -> int:
+    async def count_due_between_query(self, user_id: uuid.UUID, start: date, end: date) -> int:
+        """Count non-template tasks due within [start, end] (completion-rate denominator)."""
         from sqlalchemy import func
 
         query = select(func.count()).select_from(Task).where(
@@ -172,4 +194,6 @@ class TaskRepository(BaseRepository[Task]):
             Task.due_date >= start,
             Task.due_date <= end,
         )
-        return (await self.session.execute(query)).scalar_one()
+        query_result = await self.session.execute(query)
+        scalar_value = query_result.scalar_one()
+        return scalar_value

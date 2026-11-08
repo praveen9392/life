@@ -49,10 +49,14 @@ whatever port is mapped) and restart the `postgres` service via
 
 - Playwright runs against a **real backend** on :8000 — start one with
   `RATE_LIMIT_ENABLED=false` (register/login are rate-limited and will 429
-  across multi-project runs) pointed at `life_test`.
+  across multi-project runs) pointed at `life_test`. Stop the regular dev
+  backend first — both use :8000, and the frontend API client defaults to
+  `http://localhost:8000` (override via `VITE_API_BASE_URL` in
+  `frontend/.env.local`, gitignored).
 - `frontend/e2e/smoke.spec.ts` covers register→onboard(skip)→dashboard→
   logout→login, wrong-password error, protected-route redirect, task
-  quick-add, and health-metric logging on chromium + mobile.
+  creation via the "Add Task" modal, and health-metric logging on
+  chromium + mobile.
 - Mobile logout lives on the Profile page ("More" tab → Log out); the
   header button is hidden below `md:` — it overlapped other header controls
   on narrow viewports.
@@ -81,3 +85,26 @@ naming the Python attribute `task_list` while keeping the actual DB column
 name `list` via `mapped_column("list", ...)`. Watch for this pattern with any
 other field name that collides with a builtin (`id` is safe because it's
 never used as a bare generic subscript elsewhere).
+
+## Notes directories (folders) feature
+
+- `note_directories` (flat, per-user unique name) + nullable `notes.directory_id` FK with
+  ondelete="SET NULL". Migration head: c4a8d2e61b90 (chain: 9f4a2c1e7b3d -> c4a8d2e61b90).
+- Deleting a folder soft-deletes its contained notes (deleted_at=now(), directory_id=NULL)
+  in one UPDATE, then hard-deletes the folder row - notes are never hard-deleted by this path.
+- life_test can lag behind the dev DB (it was 2 revisions behind once). Run
+  `alembic upgrade head` against BOTH databases (second run with
+  `DATABASE_URL='postgresql+asyncpg://postgres:duck@localhost:5432/life_test'`)
+  or pytest fails with `relation "note_directories" does not exist`.
+- Frontend DnD is native HTML5 (no library). Gotcha: framer-motion's motion.button
+  consumes onDragStart/onDrag* for its own gesture system - native HTML5 drag
+  handlers must live on a plain wrapper element (the <li>), not the motion component.
+- Background subagents get exec auto-denied in this setup - have the parent session
+  run migrations/tests, or use foreground agents for command-heavy work.
+
+- Notes render markdown through `features/notes/MarkdownView.tsx` (shared by the
+  Preview pane and the reading modal): GFM via react-markdown + fenced
+  ```mermaid blocks via `MermaidDiagram.tsx`. Mermaid v12 is lazy-loaded
+  (`import("mermaid")` on first diagram) so it never enters the main bundle;
+  it initializes with `securityLevel: "strict"` (sanitizes the generated SVG)
+  and re-renders on app theme change by observing `<html data-theme>`.

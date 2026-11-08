@@ -50,7 +50,7 @@ class Settings(BaseSettings):
     refresh_cookie_name: str = "refresh_token"
     cookie_domain: str | None = None
     cookie_secure: bool = True
-    cookie_samesite: Literal["lax", "strict", "none"] = "none"
+    cookie_samesite: Literal["lax", "strict", "none"] = "lax"
 
     # Comma-separated in the env var; exposed as a list via `allowed_origins`.
     allowed_origins_raw: str = Field(default="http://localhost:5173", alias="ALLOWED_ORIGINS")
@@ -67,6 +67,13 @@ class Settings(BaseSettings):
     s3_public_base_url: str | None = None
 
     log_level: str = "INFO"
+    log_file: str | None = None
+    log_json: bool | None = None
+    max_request_body_bytes: int = 12 * 1024 * 1024
+
+    @property
+    def log_json_enabled(self) -> bool:
+        return self.is_production if self.log_json is None else self.log_json
 
     @field_validator("database_url", mode="before")
     @classmethod
@@ -97,11 +104,11 @@ class Settings(BaseSettings):
 
     def validate_production_secrets(self) -> None:
         """Fail fast at startup if a production deployment is missing secrets."""
-        if not self.is_production:
+        if self.environment in (Environment.DEVELOPMENT, Environment.TEST):
             return
         if self.jwt_secret_key == "dev-only-insecure-secret-change-me":
             raise RuntimeError("JWT_SECRET_KEY must be set to a strong secret in production")
-        if "life:life@localhost" in self.database_url:
+        if self.is_production and "life:life@localhost" in self.database_url:
             raise RuntimeError("DATABASE_URL must point at the production database")
 
 
